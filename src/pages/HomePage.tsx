@@ -87,7 +87,7 @@ export default function HomePage() {
                   step: 1 as const,
                   placeLabel: '1 место',
                   title: 'Билет',
-                  sub: 'Билет на одно из наших мероприятий',
+                  sub: 'Билет на выезд в Ягодное',
                   img: '/assets/raffle-ticket.png',
                   Icon: Medal
                 },
