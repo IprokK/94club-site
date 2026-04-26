@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+}
+
+enum EventStatus {
+  СКОРО
+  ПРОШЛО
+  ЧЕРНОВИК
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  login        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(admin)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Event {
+  id          Int         @id @default(autoincrement())
+  title       String
+  category    String
+  date        String
+  location    String
+  description String
+  image       String
+  status      EventStatus @default(СКОРО)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@index([title])
+  @@index([category])
+  @@map("events")
+}
+
+model Gallery {
+  id        Int      @id @default(autoincrement())
+  title     String
+  tag       String
+  image     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([title])
+  @@index([tag])
+  @@map("gallery")
+}
+
