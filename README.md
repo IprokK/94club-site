@@ -34,13 +34,41 @@ npm run build
 
 ## Админ-панель
 
-Админка пока работает как frontend-прототип и хранит изменения в `localStorage` браузера.
-В ней можно:
+Админка работает как мини‑CMS:
 
-- добавлять события;
-- удалять события;
-- добавлять элементы галереи;
-- удалять элементы галереи;
-- сбрасывать демо-данные.
+- `/admin/login` — вход (JWT)
+- `/admin` — защищённая админ-панель
+- CRUD для событий и галереи (SQLite через Prisma)
+- загрузка изображений (multer) + предпросмотр
+- поиск и пагинация
 
-Для реального сайта следующим этапом нужно подключить backend, базу данных и авторизацию.
+### Запуск (dev)
+
+Frontend:
+
+```bash
+npm install
+npm run dev
+```
+
+Backend:
+
+```bash
+cd server
+npm install
+cp .env.example .env
+npx prisma migrate dev --name init
+node prisma/seed.js
+npm run dev
+```
+
+### Прод (build) — рекомендуемая схема для доменов
+
+- Nginx раздаёт `dist/` как статику
+- Nginx проксирует `/api` и `/uploads` на Node backend (127.0.0.1:8787)
+- Frontend обращается к API по относительным путям `/api/*` (работает и в build)
+
+Для backend в `server/.env` выставить:
+
+- `PUBLIC_BASE_URL="https://94club.ru"` (или `https://94club.online`)
+- `CORS_ORIGINS="https://94club.ru,https://94club.online"`

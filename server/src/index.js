@@ -20,7 +20,13 @@ const PORT = Number(process.env.PORT || 8787);
 const DATABASE_URL = process.env.DATABASE_URL || 'file:./prisma/dev.db';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const CORS_ORIGINS = String(process.env.CORS_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+const SERVE_FRONTEND = String(process.env.SERVE_FRONTEND || 'false').toLowerCase() === 'true';
 
 const ADMIN_LOGIN = process.env.ADMIN_LOGIN || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin12345';
@@ -33,7 +39,17 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(morgan('dev'));
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // same-origin / server-to-server / curl
+      if (!origin) return cb(null, true);
+      if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+    credentials: true
+  })
+);
 app.use(express.json({ limit: '2mb' }));
 
 const uploadsDir = path.resolve(__dirname, '../uploads');
@@ -46,7 +62,15 @@ app.use('/api/auth', createAuthRouter({ jwtSecret: JWT_SECRET, jwtExpiresIn: JWT
 const requireAuth = authRequired({ jwtSecret: JWT_SECRET });
 app.use('/api/events', requireAuth, createEventsRouter());
 app.use('/api/gallery', requireAuth, createGalleryRouter());
-app.use('/api/uploads', requireAuth, createUploadsRouter({ uploadsDir, publicBaseUrl: `http://localhost:${PORT}` }));
+app.use('/api/uploads', requireAuth, createUploadsRouter({ uploadsDir, publicBaseUrl: PUBLIC_BASE_URL }));
+
+if (SERVE_FRONTEND) {
+  const distDir = path.resolve(__dirname, '../../dist');
+  app.use(express.static(distDir));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 app.use((err, req, res, next) => {
   // eslint-disable-next-line no-console
@@ -59,7 +83,7 @@ async function main() {
   await ensureAdminUser({ login: ADMIN_LOGIN, password: ADMIN_PASSWORD, role: ADMIN_ROLE });
   app.listen(PORT, () => {
     // eslint-disable-next-line no-console
-    console.log(`[server] http://localhost:${PORT}`);
+    console.log(`[server] ${PUBLIC_BASE_URL} (port ${PORT})`);
   });
 }
 
