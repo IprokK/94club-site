@@ -93,15 +93,15 @@ export default function HomePage() {
             <div className="raffle-poster-hero">
               <div className="raffle-poster-copy">
                 <div className="tag-row">
-                  <span className="tag tag-raffle-kicker"><Gift size={14} /> raffle</span>
+                  <span className="tag tag-raffle-kicker"><Gift size={14} /> Розыгрыш</span>
                   <Tag color="red">4 места</Tag>
                   <Tag color="white">билет • мерч • призы</Tag>
                 </div>
                 <div className="raffle-poster-title-row">
                   <h2 className="raffle-poster-title">
                     Розыгрыш <span>94 club</span>
+                    <Heart className="raffle-poster-heart" strokeWidth={1.4} size={48} aria-hidden />
                   </h2>
-                  <Heart className="raffle-poster-heart" strokeWidth={1.4} size={48} aria-hidden />
                 </div>
                 <p className="raffle-poster-desc">
                   Оставь заявку, получи номер билета и участвуй в розыгрыше. Один билет на человека (VK или Telegram).
