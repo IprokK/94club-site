@@ -15,6 +15,12 @@ export type EventDto = {
   updatedAt: string;
 };
 
+export function toPublicEventStatus(s: EventStatus): 'Скоро' | 'Прошло' | 'Черновик' {
+  if (s === 'ПРОШЛО') return 'Прошло';
+  if (s === 'ЧЕРНОВИК') return 'Черновик';
+  return 'Скоро';
+}
+
 export type Paged<T> = { items: T[]; page: number; limit: number; total: number; pages: number };
 
 export function listEvents(params: { page: number; limit: number; q: string }) {

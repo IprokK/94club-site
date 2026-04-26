@@ -63,8 +63,8 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', createAuthRouter({ jwtSecret: JWT_SECRET, jwtExpiresIn: JWT_EXPIRES_IN }));
 
 const requireAuth = authRequired({ jwtSecret: JWT_SECRET });
-app.use('/api/events', requireAuth, createEventsRouter());
-app.use('/api/gallery', requireAuth, createGalleryRouter());
+app.use('/api/events', createEventsRouter({ requireAuth }));
+app.use('/api/gallery', createGalleryRouter({ requireAuth }));
 app.use('/api/uploads', requireAuth, createUploadsRouter({ uploadsDir, publicBaseUrl: PUBLIC_BASE_URL }));
 app.use('/api/raffle', createRaffleRouter({ requireAuth }));
 
