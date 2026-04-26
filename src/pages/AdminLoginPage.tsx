@@ -8,6 +8,8 @@ import { SectionTitle, Tag } from '../components/UI';
 function errorToText(err: unknown) {
   const e = err as Partial<ApiError>;
   if (e?.status === 401) return 'Неверный логин или пароль';
+  if (e?.status === 0) return 'Backend недоступен (NETWORK). Запусти server и проверь порт.';
+  if (e?.status) return `Ошибка входа (${e.status}). ${e.error || 'REQUEST_FAILED'}`;
   return 'Ошибка входа. Попробуй ещё раз.';
 }
 

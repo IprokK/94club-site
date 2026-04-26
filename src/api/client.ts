@@ -15,8 +15,9 @@ export function clearToken() {
 }
 
 function getBaseUrl() {
-  // Vite proxy будет направлять /api на backend
-  return '';
+  // Dev: Vite proxy направляет /api на backend.
+  // Prod/деплой: можно задать VITE_API_BASE_URL, например "https://94club.ru".
+  return (import.meta as any).env?.VITE_API_BASE_URL || '';
 }
 
 async function parseJsonSafe(res: Response) {
@@ -37,7 +38,13 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const res = await fetch(`${getBaseUrl()}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${getBaseUrl()}${path}`, { ...init, headers });
+  } catch {
+    const err: ApiError = { status: 0, error: 'NETWORK_ERROR' };
+    throw err;
+  }
   if (!res.ok) {
     const body = await parseJsonSafe(res);
     const err: ApiError = { status: res.status, error: body?.error || 'REQUEST_FAILED' };
