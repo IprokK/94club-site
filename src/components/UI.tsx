@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-export function Tag({ children, color = 'lime' }: { children: ReactNode; color?: 'lime' | 'pink' | 'white' }) {
+export function Tag({ children, color = 'lime' }: { children: ReactNode; color?: 'lime' | 'pink' | 'white' | 'red' }) {
   return <span className={`tag tag-${color}`}>{children}</span>;
 }
 
