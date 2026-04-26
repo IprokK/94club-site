@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Camera, ImagePlus, LogOut, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { Camera, GripVertical, ImagePlus, LogOut, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import type { ApiError } from '../api/client';
-import { listEvents, createEvent, deleteEvent, updateEvent, type EventDto, type EventStatus } from '../api/events';
+import {
+  listEvents,
+  createEvent,
+  deleteEvent,
+  updateEvent,
+  reorderEvents,
+  type EventDto,
+  type EventStatus
+} from '../api/events';
 import {
   listGallery,
   createGallery,
@@ -36,6 +44,14 @@ type ConfirmState =
   | null
   | { kind: 'event'; id: number; title: string }
   | { kind: 'gallery'; id: number; title: string };
+
+function reorderListByIndex<T>(items: T[], from: number, to: number): T[] {
+  if (from === to) return items;
+  const n = [...items];
+  const [it] = n.splice(from, 1);
+  n.splice(to, 0, it);
+  return n;
+}
 
 export default function AdminPage() {
   const nav = useNavigate();
@@ -75,6 +91,7 @@ export default function AdminPage() {
   const [eventFile, setEventFile] = useState<File | null>(null);
   const [eventSaving, setEventSaving] = useState(false);
   const [eventFormError, setEventFormError] = useState<string | null>(null);
+  const [eventDragId, setEventDragId] = useState<number | null>(null);
 
   const [galleryModalOpen, setGalleryModalOpen] = useState(false);
   const [galleryEditId, setGalleryEditId] = useState<number | null>(null);
@@ -126,7 +143,10 @@ export default function AdminPage() {
     setEventsError(null);
     setEventsLoading(true);
     try {
-      const res = await listEvents({ page: eventsPage, limit: eventsLimit, q: eventsQ });
+      const q = eventsQ.trim();
+      const res = q
+        ? await listEvents({ page: eventsPage, limit: eventsLimit, q: eventsQ })
+        : await listEvents({ page: 1, limit: 500, q: '' });
       setEvents(res.items);
       setEventsTotal(res.total);
     } catch (e) {
@@ -341,6 +361,33 @@ export default function AdminPage() {
     setEventsPage(1);
     await loadEvents();
   };
+
+  const eventsInSearch = eventsQ.trim().length > 0;
+  const allowEventReorder = !eventsInSearch && !eventsLoading;
+
+  const handleEventDrop = async (e: DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (!allowEventReorder) return;
+    const fromId = Number(e.dataTransfer.getData('text/plain'));
+    if (!Number.isFinite(fromId)) return;
+    const fromIndex = events.findIndex((x) => x.id === fromId);
+    if (fromIndex < 0 || fromIndex === targetIndex) {
+      setEventDragId(null);
+      return;
+    }
+    const next = reorderListByIndex(events, fromIndex, targetIndex);
+    setEvents(next);
+    setEventDragId(null);
+    try {
+      await reorderEvents(next.map((x) => x.id));
+      setToast({ kind: 'ok', text: 'Порядок сохранён' });
+    } catch (err) {
+      setToast({ kind: 'error', text: apiErrorToText(err) });
+      await loadEvents();
+      if ((err as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    }
+  };
+
   const onSearchGallery = async () => {
     setGalleryPage(1);
     await loadGallery();
@@ -388,26 +435,88 @@ export default function AdminPage() {
             ) : (
               <>
                 <h3>Управление событиями</h3>
-                {events.map((e) => (
-                  <div className="admin-row" key={e.id}>
-                    <div>
+                {allowEventReorder && (
+                  <p className="admin-muted" style={{ margin: '0 0 12px' }}>
+                    Порядок строк = порядок на странице «Мероприятия». Перетащите строку за иконку слева.
+                  </p>
+                )}
+                {eventsInSearch && (
+                  <p className="admin-muted" style={{ margin: '0 0 12px' }}>
+                    При поиске сортировка отключена. Очистите поле и нажмите «Найти», чтобы снова менять порядок.
+                  </p>
+                )}
+                {events.map((e, i) => (
+                  <div
+                    className={`admin-row admin-row--event${eventDragId === e.id ? ' admin-row--drag' : ''}`}
+                    key={e.id}
+                    onDragOver={
+                      allowEventReorder
+                        ? (ev) => {
+                            ev.preventDefault();
+                            ev.dataTransfer.dropEffect = 'move';
+                          }
+                        : undefined
+                    }
+                    onDrop={allowEventReorder ? (ev) => void handleEventDrop(ev, i) : undefined}
+                  >
+                    {allowEventReorder && (
+                      <div
+                        className="admin-event-drag"
+                        draggable
+                        onDragStart={(ev) => {
+                          ev.dataTransfer.setData('text/plain', String(e.id));
+                          ev.dataTransfer.effectAllowed = 'move';
+                          setEventDragId(e.id);
+                        }}
+                        onDragEnd={() => setEventDragId(null)}
+                        title="Перетащить"
+                      >
+                        <GripVertical size={20} />
+                      </div>
+                    )}
+                    <div className="admin-row-block">
                       <Tag>{e.category}</Tag>
                       <h4>{e.title}</h4>
                       <p>{e.date} • {e.location}</p>
                     </div>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <button onClick={() => openEditEvent(e)} title="Редактировать" aria-label="Редактировать"><Pencil /></button>
-                      <button onClick={() => setConfirm({ kind: 'event', id: e.id, title: e.title })} title="Удалить" aria-label="Удалить"><Trash2 /></button>
+                      <button type="button" onClick={() => openEditEvent(e)} title="Редактировать" aria-label="Редактировать">
+                        <Pencil />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirm({ kind: 'event', id: e.id, title: e.title })}
+                        title="Удалить"
+                        aria-label="Удалить"
+                      >
+                        <Trash2 />
+                      </button>
                     </div>
                   </div>
                 ))}
-                <div className="admin-pager">
-                  <span className="admin-mini">страница <b>{eventsPage}</b> / {eventsPages}</span>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button className="button button-outline" onClick={() => setEventsPage(Math.max(1, eventsPage - 1))} disabled={eventsPage <= 1}>Назад</button>
-                    <button className="button button-outline" onClick={() => setEventsPage(Math.min(eventsPages, eventsPage + 1))} disabled={eventsPage >= eventsPages}>Дальше</button>
+                {eventsInSearch && (
+                  <div className="admin-pager">
+                    <span className="admin-mini">страница <b>{eventsPage}</b> / {eventsPages}</span>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        className="button button-outline"
+                        onClick={() => setEventsPage(Math.max(1, eventsPage - 1))}
+                        disabled={eventsPage <= 1}
+                        type="button"
+                      >
+                        Назад
+                      </button>
+                      <button
+                        className="button button-outline"
+                        onClick={() => setEventsPage(Math.min(eventsPages, eventsPage + 1))}
+                        disabled={eventsPage >= eventsPages}
+                        type="button"
+                      >
+                        Дальше
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
           </section>

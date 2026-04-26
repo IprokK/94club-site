@@ -4,6 +4,7 @@ import { eventsController } from '../controllers/eventsController.js';
 export function createEventsRouter({ requireAuth }) {
   const router = Router();
   router.get('/', eventsController.list);
+  router.put('/reorder', requireAuth, eventsController.reorder);
   router.get('/:id', eventsController.get);
   router.post('/', requireAuth, eventsController.create);
   router.patch('/:id', requireAuth, eventsController.update);

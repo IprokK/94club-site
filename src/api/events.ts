@@ -11,6 +11,7 @@ export type EventDto = {
   description: string;
   image: string;
   status: EventStatus;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -31,7 +32,7 @@ export function listEvents(params: { page: number; limit: number; q: string }) {
   return apiFetch<Paged<EventDto>>(`/api/events?${sp.toString()}`);
 }
 
-export function createEvent(input: Omit<EventDto, 'id' | 'createdAt' | 'updatedAt'>) {
+export function createEvent(input: Omit<EventDto, 'id' | 'createdAt' | 'updatedAt' | 'sortOrder'>) {
   return apiFetch<EventDto>('/api/events', { method: 'POST', body: JSON.stringify(input) });
 }
 
@@ -41,5 +42,10 @@ export function updateEvent(id: number, patch: Partial<Omit<EventDto, 'id' | 'cr
 
 export function deleteEvent(id: number) {
   return apiFetch<null>(`/api/events/${id}`, { method: 'DELETE' });
+}
+
+/** Полный список id в желаемом порядке (как на экране сверху вниз). Только с JWT. */
+export function reorderEvents(ids: number[]) {
+  return apiFetch<{ ok: boolean }>('/api/events/reorder', { method: 'PUT', body: JSON.stringify({ ids }) });
 }
 

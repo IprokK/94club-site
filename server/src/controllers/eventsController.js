@@ -19,7 +19,7 @@ const eventUpdateSchema = eventCreateSchema.partial().refine((v) => Object.keys(
 
 function parseListParams(req) {
   const page = Math.max(1, Number(req.query.page || 1) || 1);
-  const limit = Math.min(50, Math.max(1, Number(req.query.limit || 10) || 10));
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit || 10) || 10));
   const q = String(req.query.q || '').trim();
   const skip = (page - 1) * limit;
   return { page, limit, skip, q };
@@ -40,7 +40,12 @@ export const eventsController = {
       : undefined;
 
     const [items, total] = await Promise.all([
-      prisma.event.findMany({ where, orderBy: { id: 'desc' }, skip, take: limit }),
+      prisma.event.findMany({
+        where,
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        skip,
+        take: limit
+      }),
       prisma.event.count({ where })
     ]);
 
@@ -58,8 +63,32 @@ export const eventsController = {
   async create(req, res) {
     const parsed = eventCreateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
-    const created = await prisma.event.create({ data: parsed.data });
+    const m = await prisma.event.aggregate({ _min: { sortOrder: true } });
+    const sortOrder = m._min.sortOrder == null ? 0 : m._min.sortOrder - 1;
+    const created = await prisma.event.create({ data: { ...parsed.data, sortOrder } });
     res.status(201).json(created);
+  },
+
+  async reorder(req, res) {
+    const schema = z.object({
+      ids: z.array(z.number().int().positive())
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
+    const { ids } = parsed.data;
+    if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'DUP_ID' });
+    const total = await prisma.event.count();
+    if (ids.length !== total) return res.status(400).json({ error: 'COUNT_MISMATCH' });
+    const existing = new Set(
+      (await prisma.event.findMany({ select: { id: true } })).map((r) => r.id)
+    );
+    for (const id of ids) {
+      if (!existing.has(id)) return res.status(400).json({ error: 'UNKNOWN_ID' });
+    }
+    await prisma.$transaction(
+      ids.map((id, i) => prisma.event.update({ where: { id }, data: { sortOrder: i } }))
+    );
+    res.json({ ok: true });
   },
 
   async update(req, res) {

@@ -394,6 +394,11 @@ input:focus, textarea:focus { border-color: var(--lime); }
 .admin-stats span { color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .14em; font-size: 12px; }
 .admin-grid, .admin-content { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px; }
 .admin-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid var(--line); padding: 16px; margin-top: 12px; }
+.admin-row--event { flex-wrap: nowrap; }
+.admin-row--event .admin-row-block { flex: 1; min-width: 0; }
+.admin-event-drag { flex-shrink: 0; color: rgba(255, 255, 255, .4); cursor: grab; line-height: 0; user-select: none; padding: 4px; touch-action: none; }
+.admin-event-drag:active { cursor: grabbing; }
+.admin-row--drag { opacity: .6; }
 .admin-row h4 { margin: 10px 0 4px; text-transform: uppercase; }
 .admin-row p { margin: 0; color: var(--muted); }
 .admin-row button { background: rgba(255,45,85,.1); color: #ffd8e2; border: 1px solid rgba(255,45,85,.3); padding: 10px; cursor: pointer; }
