@@ -1,12 +1,10 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, CalendarDays, Sparkles } from 'lucide-react';
+import { CalendarDays, Mail, Rocket, Send, Sparkles } from 'lucide-react';
 import Logo94 from '../components/Logo94';
-import { defaultEvents } from '../data/content';
 import { AccentStripes, Tag } from '../components/UI';
 
 export default function HomePage() {
-  const topEvents = defaultEvents.slice(0, 3);
   return (
     <main>
       <section className="section-pad">
@@ -53,67 +51,55 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* блок событий с главной убран; страница "Мероприятия" остаётся отдельной */}
+
       <section className="section-pad border-top">
-        <div className="container">
-          <div className="home-mag-list">
-            {topEvents.map((event, idx) => (
-              <motion.article
-                className="home-mag-row"
-                key={event.id}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-80px' }}
-              >
-                <div className="home-mag-num">{idx + 1}</div>
-                <div className="home-mag-body">
-                  <div className="tag-row">
-                    <Tag>{event.category}</Tag>
-                    <Tag color="white">{event.status}</Tag>
-                  </div>
-                  <h2 className="home-mag-title">{event.title}</h2>
-                  <p className="home-mag-meta">{event.date} • {event.location}</p>
-                  <p className="home-mag-desc">{event.description}</p>
-                  <div className="home-mag-actions">
-                    <Link className="button button-outline" to="/events">
-                      Подробнее <ArrowRight size={16} />
-                    </Link>
-                  </div>
-                </div>
-                <div className="home-mag-media">
-                  <img src={event.image} alt={event.title} />
-                </div>
-              </motion.article>
-            ))}
+        <div className="container home-mag-footer">
+          <div className="cta-lime">
+            <h3>Не жди особенного момента. <span>Создавай его вместе с нами.</span></h3>
+            <p>Подписывайся на анонсы, приходи на мероприятия, участвуй в организации и становись частью 94 Club.</p>
+            <div className="hero-actions">
+              <a className="button button-dark" href="https://vk.com/itmo94club" target="_blank" rel="noreferrer">VK сообщества</a>
+              <a className="button button-outline-dark" href="https://t.me/itmo94club" target="_blank" rel="noreferrer">Telegram клуба</a>
+            </div>
           </div>
+
+          <form
+            className="panel form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              alert('Демо-форма: подключи backend или Formspree/Telegram bot.');
+            }}
+          >
+            <input placeholder="Твоё имя" />
+            <input placeholder="Telegram или VK" />
+            <textarea placeholder="Почему тебе интересен 94 Club?" />
+            <button className="button button-lime" type="submit"><Send size={16} /> Отправить заявку</button>
+          </form>
         </div>
       </section>
 
       <section className="section-pad border-top">
-        <div className="container home-mag-footer">
-          <div className="panel home-mag-cta">
-            <h3>Хочешь <span>с нами?</span></h3>
-            <p className="admin-muted">Следи за анонсами и приходи на события — мы всегда рады новым людям.</p>
-            <div className="home-mag-cta-actions">
-              <Link className="button button-lime" to="/join">Присоединиться</Link>
-              <Link className="button button-outline" to="/gallery">Смотреть галерею</Link>
-            </div>
+        <div className="container">
+          <div className="section-title">
+            <p>94 клуб / collaboration</p>
+            <h2>Для <span>партнёров</span></h2>
           </div>
-          <div className="panel home-mag-qr">
-            <h3>Контакты</h3>
-            <div className="home-mag-qr-grid">
-              <div className="home-mag-qr-card">
-                <b>VK</b>
-                <span>vk.com/…</span>
-              </div>
-              <div className="home-mag-qr-card">
-                <b>Telegram</b>
-                <span>t.me/…</span>
-              </div>
-            </div>
-            <div className="home-mag-quote">
-              <Tag color="pink">94 Club</Tag>
-              <p>Это твоя <b>история</b></p>
-            </div>
+          <div className="benefit-grid">
+            {[
+              { title: 'Коллаборации', text: 'Совместные мероприятия, спецпроекты, интеграции и партнёрские активности.', icon: Rocket },
+              { title: 'Инфоподдержка', text: 'Визуально сильные анонсы, соцсети и вовлечение аудитории через формат клуба.', icon: Sparkles },
+              { title: 'Контакт', text: 'Напиши нам — соберём коллаборацию под задачу и аудиторию.', icon: Mail }
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div className="benefit-card" key={item.title}>
+                  <Icon />
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

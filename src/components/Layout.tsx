@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Home, Info, CalendarDays, Image, Users, Rocket, Shield, Menu, X, Heart } from 'lucide-react';
+import { Home, Info, CalendarDays, Image, Shield, Menu, X, Heart } from 'lucide-react';
 import { useState } from 'react';
 import Logo94 from './Logo94';
 
@@ -8,8 +8,6 @@ const links = [
   { to: '/about', label: 'О клубе', icon: Info },
   { to: '/events', label: 'Мероприятия', icon: CalendarDays },
   { to: '/gallery', label: 'Галерея', icon: Image },
-  { to: '/join', label: 'Присоединиться', icon: Users },
-  { to: '/partners', label: 'Партнёрам', icon: Rocket },
   { to: '/admin', label: 'Админ', icon: Shield }
 ];
 

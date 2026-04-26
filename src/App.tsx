@@ -4,8 +4,6 @@ import HomePage from './pages/HomePage';
 import AboutPage from './pages/AboutPage';
 import EventsPage from './pages/EventsPage';
 import GalleryPage from './pages/GalleryPage';
-import JoinPage from './pages/JoinPage';
-import PartnersPage from './pages/PartnersPage';
 import AdminPage from './pages/AdminPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -19,8 +17,6 @@ export default function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/gallery" element={<GalleryPage />} />
-        <Route path="/join" element={<JoinPage />} />
-        <Route path="/partners" element={<PartnersPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
