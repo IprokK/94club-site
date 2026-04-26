@@ -8,7 +8,11 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs --env production",
+    "pm2:restart": "pm2 restart 94club-api",
+    "pm2:logs": "pm2 logs 94club-api",
+    "pm2:status": "pm2 status"
   },
   "dependencies": {
     "@prisma/client": "^6.16.1",

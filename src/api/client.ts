@@ -50,6 +50,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     const err: ApiError = { status: res.status, error: body?.error || 'REQUEST_FAILED' };
     throw err;
   }
-  return (await parseJsonSafe(res)) as T;
+  const body = await parseJsonSafe(res);
+  if (body === null && res.status !== 204) {
+    const err: ApiError = { status: res.status, error: 'BAD_RESPONSE_NOT_JSON' };
+    throw err;
+  }
+  return body as T;
 }
 
