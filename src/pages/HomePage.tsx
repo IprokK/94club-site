@@ -111,9 +111,6 @@ export default function HomePage() {
                   <Link className="button button-outline-pink" to="/raffle/draw">Розыгрыш (админ)</Link>
                 </div>
               </div>
-              <div className="raffle-poster-logo" aria-hidden>
-                <Logo94 />
-              </div>
             </div>
 
             <div className="raffle-poster-prizes">
