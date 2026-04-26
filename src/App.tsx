@@ -7,7 +7,9 @@ import GalleryPage from './pages/GalleryPage';
 import JoinPage from './pages/JoinPage';
 import PartnersPage from './pages/PartnersPage';
 import AdminPage from './pages/AdminPage';
+import AdminLoginPage from './pages/AdminLoginPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
   return (
@@ -19,7 +21,8 @@ export default function App() {
         <Route path="/gallery" element={<GalleryPage />} />
         <Route path="/join" element={<JoinPage />} />
         <Route path="/partners" element={<PartnersPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -1,87 +1,492 @@
-import { useEffect, useState } from 'react';
-import { Camera, Plus, Trash2 } from 'lucide-react';
-import { defaultEvents, defaultGallery, EventItem, GalleryItem } from '../data/content';
+import { useEffect, useMemo, useState } from 'react';
+import { Camera, ImagePlus, LogOut, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { logout } from '../api/auth';
+import type { ApiError } from '../api/client';
+import { listEvents, createEvent, deleteEvent, updateEvent, type EventDto, type EventStatus } from '../api/events';
+import { listGallery, createGallery, deleteGallery, updateGallery, type GalleryDto } from '../api/gallery';
+import { uploadImage } from '../api/uploads';
+import Modal from '../components/Modal';
 import { SectionTitle, Tag } from '../components/UI';
 
-function readEvents(): EventItem[] {
-  const saved = localStorage.getItem('94club-events');
-  return saved ? JSON.parse(saved) : defaultEvents;
+const EVENT_STATUSES: { label: string; value: EventStatus }[] = [
+  { label: 'Скоро', value: 'СКОРО' },
+  { label: 'Прошло', value: 'ПРОШЛО' },
+  { label: 'Черновик', value: 'ЧЕРНОВИК' }
+];
+
+function apiErrorToText(err: unknown) {
+  const e = err as Partial<ApiError>;
+  if (e?.status === 401) return 'Сессия истекла. Войди снова.';
+  return 'Ошибка. Проверь backend и повтори.';
 }
-function readGallery(): GalleryItem[] {
-  const saved = localStorage.getItem('94club-gallery');
-  return saved ? JSON.parse(saved) : defaultGallery;
-}
+
+type ConfirmState =
+  | null
+  | { kind: 'event'; id: number; title: string }
+  | { kind: 'gallery'; id: number; title: string };
 
 export default function AdminPage() {
-  const [events, setEvents] = useState<EventItem[]>(defaultEvents);
-  const [gallery, setGallery] = useState<GalleryItem[]>(defaultGallery);
-  const [eventForm, setEventForm] = useState({ title: '', category: 'Анонс', date: '', location: '', description: '', image: '/assets/events-poster.png' });
-  const [galleryForm, setGalleryForm] = useState({ title: '', tag: 'Новый раздел', image: '/assets/brandbook.png' });
+  const nav = useNavigate();
+
+  // Events state
+  const [events, setEvents] = useState<EventDto[]>([]);
+  const [eventsTotal, setEventsTotal] = useState(0);
+  const [eventsPage, setEventsPage] = useState(1);
+  const [eventsLimit] = useState(8);
+  const [eventsQ, setEventsQ] = useState('');
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+
+  // Gallery state
+  const [gallery, setGallery] = useState<GalleryDto[]>([]);
+  const [galleryTotal, setGalleryTotal] = useState(0);
+  const [galleryPage, setGalleryPage] = useState(1);
+  const [galleryLimit] = useState(9);
+  const [galleryQ, setGalleryQ] = useState('');
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+
+  // Modals + forms
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
+
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [eventEditId, setEventEditId] = useState<number | null>(null);
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    category: 'Анонс',
+    date: 'Скоро',
+    location: '94 Club',
+    description: '',
+    image: '',
+    status: 'СКОРО' as EventStatus
+  });
+  const [eventFile, setEventFile] = useState<File | null>(null);
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventFormError, setEventFormError] = useState<string | null>(null);
+
+  const [galleryModalOpen, setGalleryModalOpen] = useState(false);
+  const [galleryEditId, setGalleryEditId] = useState<number | null>(null);
+  const [galleryForm, setGalleryForm] = useState({ title: '', tag: 'Новый раздел', image: '' });
+  const [galleryFile, setGalleryFile] = useState<File | null>(null);
+  const [gallerySaving, setGallerySaving] = useState(false);
+  const [galleryFormError, setGalleryFormError] = useState<string | null>(null);
+
+  const [toast, setToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+
+  const stats = useMemo(() => {
+    return [
+      { b: String(eventsTotal), s: 'событий' },
+      { b: String(galleryTotal), s: 'элементов галереи' },
+      { b: 'JWT', s: 'авторизация' },
+      { b: 'DB', s: 'хранение' }
+    ];
+  }, [eventsTotal, galleryTotal]);
+
+  const eventPreviewUrl = useMemo(() => {
+    if (eventFile) return URL.createObjectURL(eventFile);
+    return eventForm.image || '';
+  }, [eventFile, eventForm.image]);
+
+  const galleryPreviewUrl = useMemo(() => {
+    if (galleryFile) return URL.createObjectURL(galleryFile);
+    return galleryForm.image || '';
+  }, [galleryFile, galleryForm.image]);
 
   useEffect(() => {
-    setEvents(readEvents());
-    setGallery(readGallery());
-  }, []);
-  useEffect(() => localStorage.setItem('94club-events', JSON.stringify(events)), [events]);
-  useEffect(() => localStorage.setItem('94club-gallery', JSON.stringify(gallery)), [gallery]);
+    return () => {
+      if (eventFile) URL.revokeObjectURL(eventPreviewUrl);
+      if (galleryFile) URL.revokeObjectURL(galleryPreviewUrl);
+    };
+  }, [eventFile, eventPreviewUrl, galleryFile, galleryPreviewUrl]);
 
-  const addEvent = () => {
-    if (!eventForm.title.trim()) return;
-    setEvents([{ id: Date.now(), title: eventForm.title, category: eventForm.category, date: eventForm.date || 'Скоро', location: eventForm.location || '94 Club', status: 'Скоро', image: eventForm.image, description: eventForm.description || 'Описание появится здесь.' }, ...events]);
-    setEventForm({ title: '', category: 'Анонс', date: '', location: '', description: '', image: '/assets/events-poster.png' });
+  const loadEvents = async () => {
+    setEventsError(null);
+    setEventsLoading(true);
+    try {
+      const res = await listEvents({ page: eventsPage, limit: eventsLimit, q: eventsQ });
+      setEvents(res.items);
+      setEventsTotal(res.total);
+    } catch (e) {
+      const text = apiErrorToText(e);
+      setEventsError(text);
+      if ((e as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    } finally {
+      setEventsLoading(false);
+    }
   };
 
-  const addGallery = () => {
-    if (!galleryForm.title.trim()) return;
-    setGallery([{ id: Date.now(), title: galleryForm.title, tag: galleryForm.tag, image: galleryForm.image }, ...gallery]);
-    setGalleryForm({ title: '', tag: 'Новый раздел', image: '/assets/brandbook.png' });
+  const loadGallery = async () => {
+    setGalleryError(null);
+    setGalleryLoading(true);
+    try {
+      const res = await listGallery({ page: galleryPage, limit: galleryLimit, q: galleryQ });
+      setGallery(res.items);
+      setGalleryTotal(res.total);
+    } catch (e) {
+      const text = apiErrorToText(e);
+      setGalleryError(text);
+      if ((e as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    } finally {
+      setGalleryLoading(false);
+    }
   };
 
-  const resetAll = () => {
-    setEvents(defaultEvents); setGallery(defaultGallery); localStorage.removeItem('94club-events'); localStorage.removeItem('94club-gallery');
+  useEffect(() => {
+    loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventsPage]);
+  useEffect(() => {
+    loadGallery();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [galleryPage]);
+
+  const onLogout = () => {
+    logout();
+    nav('/admin/login', { replace: true });
+  };
+
+  const openCreateEvent = () => {
+    setEventEditId(null);
+    setEventForm({ title: '', category: 'Анонс', date: 'Скоро', location: '94 Club', description: '', image: '', status: 'СКОРО' });
+    setEventFile(null);
+    setEventFormError(null);
+    setEventModalOpen(true);
+  };
+
+  const openEditEvent = (e: EventDto) => {
+    setEventEditId(e.id);
+    setEventForm({
+      title: e.title,
+      category: e.category,
+      date: e.date,
+      location: e.location,
+      description: e.description,
+      image: e.image,
+      status: e.status
+    });
+    setEventFile(null);
+    setEventFormError(null);
+    setEventModalOpen(true);
+  };
+
+  const saveEvent = async () => {
+    setEventFormError(null);
+    setEventSaving(true);
+    try {
+      let image = eventForm.image;
+      if (eventFile) {
+        const up = await uploadImage(eventFile);
+        image = up.url;
+      }
+
+      const payload = { ...eventForm, image: image || '/assets/events-poster.png' };
+      if (eventEditId) await updateEvent(eventEditId, payload);
+      else await createEvent(payload);
+
+      setEventModalOpen(false);
+      setToast({ kind: 'ok', text: eventEditId ? 'Событие обновлено' : 'Событие создано' });
+      await loadEvents();
+    } catch (e) {
+      const text = apiErrorToText(e);
+      setEventFormError(text);
+      setToast({ kind: 'error', text });
+      if ((e as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    } finally {
+      setEventSaving(false);
+    }
+  };
+
+  const openCreateGallery = () => {
+    setGalleryEditId(null);
+    setGalleryForm({ title: '', tag: 'Новый раздел', image: '' });
+    setGalleryFile(null);
+    setGalleryFormError(null);
+    setGalleryModalOpen(true);
+  };
+
+  const openEditGallery = (g: GalleryDto) => {
+    setGalleryEditId(g.id);
+    setGalleryForm({ title: g.title, tag: g.tag, image: g.image });
+    setGalleryFile(null);
+    setGalleryFormError(null);
+    setGalleryModalOpen(true);
+  };
+
+  const saveGallery = async () => {
+    setGalleryFormError(null);
+    setGallerySaving(true);
+    try {
+      let image = galleryForm.image;
+      if (galleryFile) {
+        const up = await uploadImage(galleryFile);
+        image = up.url;
+      }
+
+      const payload = { ...galleryForm, image: image || '/assets/brandbook.png' };
+      if (galleryEditId) await updateGallery(galleryEditId, payload);
+      else await createGallery(payload);
+
+      setGalleryModalOpen(false);
+      setToast({ kind: 'ok', text: galleryEditId ? 'Элемент обновлён' : 'Элемент добавлен' });
+      await loadGallery();
+    } catch (e) {
+      const text = apiErrorToText(e);
+      setGalleryFormError(text);
+      setToast({ kind: 'error', text });
+      if ((e as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    } finally {
+      setGallerySaving(false);
+    }
+  };
+
+  const doDelete = async () => {
+    if (!confirm) return;
+    try {
+      if (confirm.kind === 'event') await deleteEvent(confirm.id);
+      else await deleteGallery(confirm.id);
+      setConfirm(null);
+      setToast({ kind: 'ok', text: 'Удалено' });
+      if (confirm.kind === 'event') await loadEvents();
+      else await loadGallery();
+    } catch (e) {
+      const text = apiErrorToText(e);
+      setToast({ kind: 'error', text });
+      if ((e as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    }
+  };
+
+  const eventsPages = Math.max(1, Math.ceil(eventsTotal / eventsLimit));
+  const galleryPages = Math.max(1, Math.ceil(galleryTotal / galleryLimit));
+
+  const onSearchEvents = async () => {
+    setEventsPage(1);
+    await loadEvents();
+  };
+  const onSearchGallery = async () => {
+    setGalleryPage(1);
+    await loadGallery();
   };
 
   return (
     <main className="section-pad">
       <div className="container">
         <SectionTitle kicker="94 клуб / admin" a="Админ" b="панель" />
+
         <div className="admin-stats">
-          <div><b>{events.length}</b><span>событий</span></div>
-          <div><b>{gallery.length}</b><span>элементов галереи</span></div>
-          <div><b>local</b><span>хранение</span></div>
-          <div><b>UI</b><span>готово к backend</span></div>
+          {stats.map((s, i) => (
+            <div key={i}>
+              <b>{s.b}</b>
+              <span>{s.s}</span>
+            </div>
+          ))}
         </div>
+
+        {toast && (
+          <div className={`admin-alert ${toast.kind === 'ok' ? 'admin-alert-ok' : 'admin-alert-error'}`} style={{ marginBottom: 14 }}>
+            {toast.text}
+          </div>
+        )}
+
         <div className="admin-grid">
-          <section className="panel form">
-            <h3><Plus /> Добавить событие</h3>
+          <section className="panel">
+            <div className="admin-toolbar">
+              <div className="search">
+                <input
+                  placeholder="Поиск по событиям…"
+                  value={eventsQ}
+                  onChange={(e) => setEventsQ(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && onSearchEvents()}
+                />
+              </div>
+              <div className="actions">
+                <button className="button button-outline" onClick={onSearchEvents}><Search size={16} /> Найти</button>
+                <button className="button button-lime" onClick={openCreateEvent}><Plus size={16} /> Событие</button>
+              </div>
+            </div>
+            {eventsError && <div className="admin-alert admin-alert-error">{eventsError}</div>}
+            {eventsLoading ? (
+              <p className="admin-muted">Загрузка…</p>
+            ) : (
+              <>
+                <h3>Управление событиями</h3>
+                {events.map((e) => (
+                  <div className="admin-row" key={e.id}>
+                    <div>
+                      <Tag>{e.category}</Tag>
+                      <h4>{e.title}</h4>
+                      <p>{e.date} • {e.location}</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <button onClick={() => openEditEvent(e)} title="Редактировать" aria-label="Редактировать"><Pencil /></button>
+                      <button onClick={() => setConfirm({ kind: 'event', id: e.id, title: e.title })} title="Удалить" aria-label="Удалить"><Trash2 /></button>
+                    </div>
+                  </div>
+                ))}
+                <div className="admin-pager">
+                  <span className="admin-mini">страница <b>{eventsPage}</b> / {eventsPages}</span>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button className="button button-outline" onClick={() => setEventsPage(Math.max(1, eventsPage - 1))} disabled={eventsPage <= 1}>Назад</button>
+                    <button className="button button-outline" onClick={() => setEventsPage(Math.min(eventsPages, eventsPage + 1))} disabled={eventsPage >= eventsPages}>Дальше</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="admin-toolbar">
+              <div className="search">
+                <input
+                  placeholder="Поиск по галерее…"
+                  value={galleryQ}
+                  onChange={(e) => setGalleryQ(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && onSearchGallery()}
+                />
+              </div>
+              <div className="actions">
+                <button className="button button-outline" onClick={onSearchGallery}><Search size={16} /> Найти</button>
+                <button className="button button-pink" onClick={openCreateGallery}><Camera size={16} /> Галерея</button>
+              </div>
+            </div>
+            {galleryError && <div className="admin-alert admin-alert-error">{galleryError}</div>}
+            {galleryLoading ? (
+              <p className="admin-muted">Загрузка…</p>
+            ) : (
+              <>
+                <h3>Управление галереей</h3>
+                {gallery.map((g) => (
+                  <div className="admin-row" key={g.id}>
+                    <div>
+                      <Tag color="white">{g.tag}</Tag>
+                      <h4>{g.title}</h4>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <button onClick={() => openEditGallery(g)} title="Редактировать" aria-label="Редактировать"><Pencil /></button>
+                      <button onClick={() => setConfirm({ kind: 'gallery', id: g.id, title: g.title })} title="Удалить" aria-label="Удалить"><Trash2 /></button>
+                    </div>
+                  </div>
+                ))}
+                <div className="admin-pager">
+                  <span className="admin-mini">страница <b>{galleryPage}</b> / {galleryPages}</span>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button className="button button-outline" onClick={() => setGalleryPage(Math.max(1, galleryPage - 1))} disabled={galleryPage <= 1}>Назад</button>
+                    <button className="button button-outline" onClick={() => setGalleryPage(Math.min(galleryPages, galleryPage + 1))} disabled={galleryPage >= galleryPages}>Дальше</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <button className="button button-outline" onClick={onLogout}><LogOut size={16} /> Выйти</button>
+        </div>
+      </div>
+
+      <Modal
+        open={eventModalOpen}
+        title={eventEditId ? 'Редактировать событие' : 'Создать событие'}
+        onClose={() => setEventModalOpen(false)}
+      >
+        <div className="form">
+          <div className="admin-split">
             <input placeholder="Название" value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} />
             <input placeholder="Категория" value={eventForm.category} onChange={(e) => setEventForm({ ...eventForm, category: e.target.value })} />
             <input placeholder="Дата" value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} />
             <input placeholder="Локация" value={eventForm.location} onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })} />
-            <input placeholder="Путь к картинке" value={eventForm.image} onChange={(e) => setEventForm({ ...eventForm, image: e.target.value })} />
-            <textarea placeholder="Описание" value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} />
-            <button className="button button-lime" onClick={addEvent}>Добавить</button>
-          </section>
-          <section className="panel form">
-            <h3><Camera /> Добавить в галерею</h3>
-            <input placeholder="Название" value={galleryForm.title} onChange={(e) => setGalleryForm({ ...galleryForm, title: e.target.value })} />
-            <input placeholder="Тег" value={galleryForm.tag} onChange={(e) => setGalleryForm({ ...galleryForm, tag: e.target.value })} />
-            <input placeholder="Путь к картинке" value={galleryForm.image} onChange={(e) => setGalleryForm({ ...galleryForm, image: e.target.value })} />
-            <button className="button button-pink" onClick={addGallery}>Добавить</button>
-            <button className="button button-outline" onClick={resetAll}>Сбросить демо-данные</button>
-          </section>
+            <textarea className="full" placeholder="Описание" value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} />
+          </div>
+
+          <div className="admin-toolbar" style={{ marginTop: 6, marginBottom: 0 }}>
+            <div className="actions">
+              <span className="admin-mini">Статус:</span>
+              <select
+                value={eventForm.status}
+                onChange={(e) => setEventForm({ ...eventForm, status: e.target.value as EventStatus })}
+                style={{ background: '#000', color: '#fff', border: '1px solid var(--line)', padding: '14px 14px', minHeight: 52 }}
+              >
+                {EVENT_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="admin-file">
+            <b><ImagePlus size={16} /> Картинка</b>
+            <div style={{ height: 10 }} />
+            <input placeholder="URL (или загрузка ниже)" value={eventForm.image} onChange={(e) => setEventForm({ ...eventForm, image: e.target.value })} />
+            <input type="file" accept="image/*" onChange={(e) => setEventFile(e.target.files?.[0] || null)} />
+          </div>
+
+          {!!eventPreviewUrl && (
+            <div className="admin-preview">
+              <img src={eventPreviewUrl} alt="preview" />
+              <div>
+                <div className="admin-mini">предпросмотр</div>
+                <div className="admin-muted">Если выбрана загрузка — URL автоматически подставится после сохранения.</div>
+              </div>
+            </div>
+          )}
+
+          {eventFormError && <div className="admin-alert admin-alert-error">{eventFormError}</div>}
+          <div className="admin-actions-row">
+            <button className="button button-outline" onClick={() => setEventModalOpen(false)} disabled={eventSaving}>Отмена</button>
+            <button className="button button-lime" onClick={saveEvent} disabled={eventSaving || !eventForm.title.trim()}>
+              {eventSaving ? 'Сохраняем…' : 'Сохранить'}
+            </button>
+          </div>
         </div>
-        <div className="admin-content">
-          <section className="panel">
-            <h3>Управление событиями</h3>
-            {events.map((event) => <div className="admin-row" key={event.id}><div><Tag>{event.category}</Tag><h4>{event.title}</h4><p>{event.date} • {event.location}</p></div><button onClick={() => setEvents(events.filter(e => e.id !== event.id))}><Trash2 /></button></div>)}
-          </section>
-          <section className="panel">
-            <h3>Управление галереей</h3>
-            {gallery.map((item) => <div className="admin-row" key={item.id}><div><Tag color="white">{item.tag}</Tag><h4>{item.title}</h4></div><button onClick={() => setGallery(gallery.filter(g => g.id !== item.id))}><Trash2 /></button></div>)}
-          </section>
+      </Modal>
+
+      <Modal
+        open={galleryModalOpen}
+        title={galleryEditId ? 'Редактировать галерею' : 'Добавить в галерею'}
+        onClose={() => setGalleryModalOpen(false)}
+      >
+        <div className="form">
+          <input placeholder="Название" value={galleryForm.title} onChange={(e) => setGalleryForm({ ...galleryForm, title: e.target.value })} />
+          <input placeholder="Тег" value={galleryForm.tag} onChange={(e) => setGalleryForm({ ...galleryForm, tag: e.target.value })} />
+
+          <div className="admin-file">
+            <b><ImagePlus size={16} /> Картинка</b>
+            <div style={{ height: 10 }} />
+            <input placeholder="URL (или загрузка ниже)" value={galleryForm.image} onChange={(e) => setGalleryForm({ ...galleryForm, image: e.target.value })} />
+            <input type="file" accept="image/*" onChange={(e) => setGalleryFile(e.target.files?.[0] || null)} />
+          </div>
+
+          {!!galleryPreviewUrl && (
+            <div className="admin-preview">
+              <img src={galleryPreviewUrl} alt="preview" />
+              <div>
+                <div className="admin-mini">предпросмотр</div>
+                <div className="admin-muted">Если выбрана загрузка — URL автоматически подставится после сохранения.</div>
+              </div>
+            </div>
+          )}
+
+          {galleryFormError && <div className="admin-alert admin-alert-error">{galleryFormError}</div>}
+          <div className="admin-actions-row">
+            <button className="button button-outline" onClick={() => setGalleryModalOpen(false)} disabled={gallerySaving}>Отмена</button>
+            <button className="button button-pink" onClick={saveGallery} disabled={gallerySaving || !galleryForm.title.trim()}>
+              {gallerySaving ? 'Сохраняем…' : 'Сохранить'}
+            </button>
+          </div>
         </div>
-      </div>
+      </Modal>
+
+      <Modal open={!!confirm} title="Подтвердить удаление" onClose={() => setConfirm(null)}>
+        <div className="form">
+          <div className="admin-alert admin-alert-error">
+            Удалить “{confirm?.title}”? Действие необратимо.
+          </div>
+          <div className="admin-actions-row">
+            <button className="button button-outline" onClick={() => setConfirm(null)}>Отмена</button>
+            <button className="button button-pink" onClick={doDelete}>Удалить</button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 }
