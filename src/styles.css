@@ -96,16 +96,8 @@ h1 span { color: var(--lime); display: block; }
 .poster-copy h3 span { color: var(--lime); display: block; }
 .poster-copy p { color: rgba(255,255,255,.65); text-transform: uppercase; letter-spacing: .18em; }
 .logo94 { position: relative; display: inline-block; }
-.logo-main { position: relative; width: 170px; height: 120px; }
-.logo-nine, .logo-four { position: absolute; font-size: 110px; font-weight: 950; line-height: 1; letter-spacing: -.08em; }
-.logo-nine { left: 0; top: 0; color: var(--lime); }
-.logo-four { left: 82px; top: 0; color: #fff; }
-.logo-slash { position: absolute; left: 85px; top: 0; height: 126px; width: 6px; background: var(--pink); transform: rotate(18deg); box-shadow: 0 0 16px rgba(255,45,85,.8); z-index: 2; }
-.logo-word { margin-top: -6px; display: flex; gap: 21px; font-size: 16px; font-weight: 700; letter-spacing: .42em; }
-.logo-tagline { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; color: rgba(255,255,255,.65); text-transform: uppercase; letter-spacing: .28em; font-size: 11px; }
-.logo-tagline span:first-child { color: var(--lime); }
-.logo-tagline span:last-child { color: var(--pink); }
-.logo94.compact { transform: scale(.62); transform-origin: left top; height: 106px; }
+.logo94 .logo-img { width: 220px; height: auto; display: block; }
+.logo94.compact .logo-img { width: 150px; }
 .accent-stripes { display: flex; gap: 8px; margin-top: 24px; }
 .accent-stripes i { display: block; width: 48px; height: 10px; transform: skewX(-28deg); }
 .accent-stripes i:nth-child(1) { background: var(--lime); } .accent-stripes i:nth-child(2) { background: var(--pink); } .accent-stripes i:nth-child(3) { background: #fff; }
