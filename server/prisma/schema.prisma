@@ -46,12 +46,13 @@ model Event {
 }
 
 model Gallery {
-  id        Int      @id @default(autoincrement())
-  title     String
-  tag       String
-  image     String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              Int      @id @default(autoincrement())
+  title           String
+  tag             String
+  image           String
+  yandexDiskUrl   String?  @map("yandex_disk_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@index([title])
   @@index([tag])

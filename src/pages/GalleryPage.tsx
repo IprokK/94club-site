@@ -19,7 +19,8 @@ export default function GalleryPage() {
           id: g.id,
           title: g.title,
           tag: g.tag,
-          image: g.image
+          image: g.image,
+          yandexDiskUrl: g.yandexDiskUrl
         }));
         setGallery(mapped);
       })
@@ -49,7 +50,20 @@ export default function GalleryPage() {
           {gallery.map((item) => (
             <article className="gallery-card" key={item.id}>
               <img src={item.image} alt={item.title} />
-              <div><span>{item.tag}</span><h3>{item.title}</h3></div>
+              <div>
+                <span>{item.tag}</span>
+                <h3>{item.title}</h3>
+                {item.yandexDiskUrl ? (
+                  <a
+                    className="button button-outline gallery-yandex"
+                    href={item.yandexDiskUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Все фото на Яндекс.Диске
+                  </a>
+                ) : null}
+              </div>
             </article>
           ))}
         </div>

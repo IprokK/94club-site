@@ -14,6 +14,8 @@ export type GalleryItem = {
   title: string;
   tag: string;
   image: string;
+  /** Ссылка на папку с фото на Яндекс.Диске (с API). */
+  yandexDiskUrl?: string | null;
 };
 
 export const defaultEvents: EventItem[] = [

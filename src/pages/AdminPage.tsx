@@ -4,7 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import type { ApiError } from '../api/client';
 import { listEvents, createEvent, deleteEvent, updateEvent, type EventDto, type EventStatus } from '../api/events';
-import { listGallery, createGallery, deleteGallery, updateGallery, type GalleryDto } from '../api/gallery';
+import {
+  listGallery,
+  createGallery,
+  deleteGallery,
+  updateGallery,
+  type GalleryDto,
+  type GalleryWriteBody
+} from '../api/gallery';
 import { getSiteSettings, updateSiteSettings, type SiteSettingsPublic } from '../api/settings';
 import { listJoinRequests, type JoinRequestDto } from '../api/join';
 import { uploadImage } from '../api/uploads';
@@ -71,7 +78,7 @@ export default function AdminPage() {
 
   const [galleryModalOpen, setGalleryModalOpen] = useState(false);
   const [galleryEditId, setGalleryEditId] = useState<number | null>(null);
-  const [galleryForm, setGalleryForm] = useState({ title: '', tag: 'Новый раздел', image: '' });
+  const [galleryForm, setGalleryForm] = useState({ title: '', tag: 'Новый раздел', image: '', yandexDiskUrl: '' });
   const [galleryFile, setGalleryFile] = useState<File | null>(null);
   const [gallerySaving, setGallerySaving] = useState(false);
   const [galleryFormError, setGalleryFormError] = useState<string | null>(null);
@@ -265,7 +272,7 @@ export default function AdminPage() {
 
   const openCreateGallery = () => {
     setGalleryEditId(null);
-    setGalleryForm({ title: '', tag: 'Новый раздел', image: '' });
+    setGalleryForm({ title: '', tag: 'Новый раздел', image: '', yandexDiskUrl: '' });
     setGalleryFile(null);
     setGalleryFormError(null);
     setGalleryModalOpen(true);
@@ -273,7 +280,7 @@ export default function AdminPage() {
 
   const openEditGallery = (g: GalleryDto) => {
     setGalleryEditId(g.id);
-    setGalleryForm({ title: g.title, tag: g.tag, image: g.image });
+    setGalleryForm({ title: g.title, tag: g.tag, image: g.image, yandexDiskUrl: g.yandexDiskUrl ?? '' });
     setGalleryFile(null);
     setGalleryFormError(null);
     setGalleryModalOpen(true);
@@ -289,7 +296,11 @@ export default function AdminPage() {
         image = up.url;
       }
 
-      const payload = { ...galleryForm, image: image || '/assets/brandbook.png' };
+      const imageFinal = image || '/assets/brandbook.png';
+      const yandex = galleryForm.yandexDiskUrl.trim();
+      const payload: GalleryWriteBody = { title: galleryForm.title, tag: galleryForm.tag, image: imageFinal };
+      if (yandex) payload.yandexDiskUrl = yandex;
+      else if (galleryEditId != null) payload.yandexDiskUrl = '';
       if (galleryEditId) await updateGallery(galleryEditId, payload);
       else await createGallery(payload);
 
@@ -596,6 +607,14 @@ export default function AdminPage() {
             <div style={{ height: 10 }} />
             <input placeholder="URL (или загрузка ниже)" value={galleryForm.image} onChange={(e) => setGalleryForm({ ...galleryForm, image: e.target.value })} />
             <input type="file" accept="image/*" onChange={(e) => setGalleryFile(e.target.files?.[0] || null)} />
+            <p className="admin-muted" style={{ margin: '6px 0 0' }}>
+              Папка с фото на Яндекс.Диске (опционально) — публичная ссылка вида https://disk.yandex.ru/…
+            </p>
+            <input
+              placeholder="https://disk.yandex.ru/…"
+              value={galleryForm.yandexDiskUrl}
+              onChange={(e) => setGalleryForm({ ...galleryForm, yandexDiskUrl: e.target.value })}
+            />
           </div>
 
           {!!galleryPreviewUrl && (

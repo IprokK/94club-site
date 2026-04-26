@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CalendarDays, Gift, Heart, Mail, Medal, Rocket, Send, Sparkles } from 'lucide-react';
 import type { ApiError } from '../api/client';
@@ -20,7 +20,13 @@ function activitiesWord(n: number): string {
   return 'активностей';
 }
 
+function scrollToJoinForm() {
+  const el = document.getElementById('join');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 export default function HomePage() {
+  const location = useLocation();
   const [eventsTotal, setEventsTotal] = useState<number | null>(null);
   const [siteSettings, setSiteSettings] = useState<SiteSettingsPublic>(defaultSiteSettings);
 
@@ -49,6 +55,12 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (location.pathname !== '/' || location.hash !== '#join') return;
+    const t = window.setTimeout(() => scrollToJoinForm(), 80);
+    return () => window.clearTimeout(t);
+  }, [location.pathname, location.hash]);
+
   const activitiesLine = useMemo(() => {
     if (eventsTotal === null) return { n: '—', t: 'активностей' };
     return { n: String(eventsTotal), t: activitiesWord(eventsTotal) };
@@ -70,7 +82,17 @@ export default function HomePage() {
               Мы создаём события, которые вдохновляют, объединяют и дают новые возможности.
             </p>
             <div className="hero-actions">
-              <Link className="button button-lime" to="/#join">Вступить в клуб</Link>
+              <Link
+                className="button button-lime"
+                to="/#join"
+                onClick={() => {
+                  if (location.pathname === '/') {
+                    window.setTimeout(() => scrollToJoinForm(), 0);
+                  }
+                }}
+              >
+                Вступить в клуб
+              </Link>
               <Link className="button button-outline" to="/events">Смотреть события</Link>
             </div>
             <AccentStripes />

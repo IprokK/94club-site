@@ -4,7 +4,8 @@ import { prisma } from '../lib/prisma.js';
 const galleryCreateSchema = z.object({
   title: z.string().min(1),
   tag: z.string().min(1),
-  image: z.string().min(1)
+  image: z.string().min(1),
+  yandexDiskUrl: z.union([z.string().url(), z.literal('')]).optional()
 });
 
 const galleryUpdateSchema = galleryCreateSchema.partial().refine((v) => Object.keys(v).length > 0, {
@@ -47,7 +48,10 @@ export const galleryController = {
   async create(req, res) {
     const parsed = galleryCreateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
-    const created = await prisma.gallery.create({ data: parsed.data });
+    const { yandexDiskUrl, ...rest } = parsed.data;
+    const created = await prisma.gallery.create({
+      data: { ...rest, yandexDiskUrl: yandexDiskUrl || null }
+    });
     res.status(201).json(created);
   },
 
@@ -59,7 +63,11 @@ export const galleryController = {
     if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
 
     try {
-      const updated = await prisma.gallery.update({ where: { id }, data: parsed.data });
+      const patch = { ...parsed.data };
+      if (Object.prototype.hasOwnProperty.call(patch, 'yandexDiskUrl')) {
+        patch.yandexDiskUrl = patch.yandexDiskUrl || null;
+      }
+      const updated = await prisma.gallery.update({ where: { id }, data: patch });
       res.json(updated);
     } catch {
       res.status(404).json({ error: 'NOT_FOUND' });
