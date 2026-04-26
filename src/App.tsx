@@ -1,0 +1,27 @@
+import { Route, Routes } from 'react-router-dom';
+import Layout from './components/Layout';
+import HomePage from './pages/HomePage';
+import AboutPage from './pages/AboutPage';
+import EventsPage from './pages/EventsPage';
+import GalleryPage from './pages/GalleryPage';
+import JoinPage from './pages/JoinPage';
+import PartnersPage from './pages/PartnersPage';
+import AdminPage from './pages/AdminPage';
+import NotFoundPage from './pages/NotFoundPage';
+
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/events" element={<EventsPage />} />
+        <Route path="/gallery" element={<GalleryPage />} />
+        <Route path="/join" element={<JoinPage />} />
+        <Route path="/partners" element={<PartnersPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  );
+}
