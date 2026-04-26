@@ -3,9 +3,13 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CalendarDays, Gift, Heart, Mail, Medal, Rocket, Send, Sparkles } from 'lucide-react';
 import type { ApiError } from '../api/client';
+import { createJoinRequest } from '../api/join';
 import { listEvents } from '../api/events';
+import { getSiteSettings, type SiteSettingsPublic } from '../api/settings';
 import Logo94 from '../components/Logo94';
 import { AccentStripes, Tag } from '../components/UI';
+
+const defaultSiteSettings: SiteSettingsPublic = { calendarLabel: 'календарь', calendarPath: '/events' };
 
 function activitiesWord(n: number): string {
   const m10 = n % 10;
@@ -18,6 +22,13 @@ function activitiesWord(n: number): string {
 
 export default function HomePage() {
   const [eventsTotal, setEventsTotal] = useState<number | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettingsPublic>(defaultSiteSettings);
+
+  const [joinName, setJoinName] = useState('');
+  const [joinContact, setJoinContact] = useState('');
+  const [joinMessage, setJoinMessage] = useState('');
+  const [joinState, setJoinState] = useState<'idle' | 'sending' | 'ok' | 'err'>('idle');
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -30,6 +41,9 @@ export default function HomePage() {
         if (!active) return;
         setEventsTotal(null);
       });
+    getSiteSettings()
+      .then((s) => active && setSiteSettings(s))
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -79,8 +93,11 @@ export default function HomePage() {
               ))}
             </div>
             <div className="home-mag-note">
-              <Tag><CalendarDays size={14} /> календарь</Tag>
-              <Tag color="pink"><Sparkles size={14} /> атмосфера</Tag>
+              <Link className="home-cal-wrap" to={siteSettings.calendarPath}>
+                <Tag>
+                  <CalendarDays size={14} /> {siteSettings.calendarLabel}
+                </Tag>
+              </Link>
             </div>
           </motion.aside>
         </div>
@@ -99,7 +116,7 @@ export default function HomePage() {
                 </div>
                 <div className="raffle-poster-title-row">
                   <h2 className="raffle-poster-title">
-                    Розыгрыш <span>94 club</span>
+                    Розыгрыш <span>94 club </span>
                     <Heart className="raffle-poster-heart" strokeWidth={1.4} size={48} aria-hidden />
                   </h2>
                 </div>
@@ -220,15 +237,61 @@ export default function HomePage() {
 
           <form
             className="panel form"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              alert('Демо-форма: подключи backend или Formspree/Telegram bot.');
+              setJoinError(null);
+              const name = joinName.trim();
+              const contact = joinContact.trim();
+              const message = joinMessage.trim();
+              if (!name || !contact || !message) {
+                setJoinError('Заполни все поля.');
+                return;
+              }
+              setJoinState('sending');
+              try {
+                await createJoinRequest({ name, contact, message });
+                setJoinName('');
+                setJoinContact('');
+                setJoinMessage('');
+                setJoinState('ok');
+              } catch (err) {
+                const api = err as ApiError;
+                setJoinState('idle');
+                setJoinError(
+                  api?.status === 0
+                    ? 'Не удалось отправить: проверьте соединение и что API запущен.'
+                    : `Не удалось отправить${api?.error ? ` (${api.error})` : ''}.`
+                );
+              }
             }}
           >
-            <input placeholder="Твоё имя" />
-            <input placeholder="Telegram или VK" />
-            <textarea placeholder="Почему тебе интересен 94 Club?" />
-            <button className="button button-lime" type="submit"><Send size={16} /> Отправить заявку</button>
+            {joinState === 'ok' && (
+              <div className="admin-alert admin-alert-ok" style={{ textTransform: 'none', letterSpacing: 'normal' }}>
+                Заявка отправлена. Мы увидим её в админке; при настройке Telegram-бота уйдёт и уведомление туда.
+              </div>
+            )}
+            {joinError && <div className="admin-alert admin-alert-error" style={{ textTransform: 'none' }}>{joinError}</div>}
+            <input
+              placeholder="Твоё имя"
+              value={joinName}
+              onChange={(e) => setJoinName(e.target.value)}
+              disabled={joinState === 'sending'}
+            />
+            <input
+              placeholder="Telegram или VK"
+              value={joinContact}
+              onChange={(e) => setJoinContact(e.target.value)}
+              disabled={joinState === 'sending'}
+            />
+            <textarea
+              placeholder="Почему тебе интересен 94 Club?"
+              value={joinMessage}
+              onChange={(e) => setJoinMessage(e.target.value)}
+              disabled={joinState === 'sending'}
+            />
+            <button className="button button-lime" type="submit" disabled={joinState === 'sending'}>
+              <Send size={16} /> {joinState === 'sending' ? 'Отправляем…' : 'Отправить заявку'}
+            </button>
           </form>
         </div>
       </section>

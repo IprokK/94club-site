@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
 import { login as apiLogin } from '../api/auth';
 import type { ApiError } from '../api/client';
-import { SectionTitle, Tag } from '../components/UI';
+import { SectionTitle } from '../components/UI';
 
 function errorToText(err: unknown) {
   const e = err as Partial<ApiError>;
@@ -38,40 +38,19 @@ export default function AdminLoginPage() {
 
   return (
     <main className="section-pad">
-      <div className="container">
+      <div className="container" style={{ maxWidth: 520 }}>
         <SectionTitle kicker="94 клуб / admin" a="Вход" b="в админку" />
 
-        <div className="admin-grid">
-          <section className="panel form">
-            <h3><Shield /> Авторизация</h3>
-            <div className="tag-row">
-              <Tag>JWT</Tag>
-              <Tag color="pink">protected</Tag>
-            </div>
-            <input placeholder="Логин" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" />
-            <input placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" />
-            {error && <div className="admin-alert admin-alert-error">{error}</div>}
-            <button className="button button-lime" onClick={onSubmit} disabled={loading || !login || !password}>
-              {loading ? 'Входим…' : 'Войти'}
-            </button>
-            <div className="admin-hint">
-              <span>Подсказка:</span> логин/пароль берутся из `server/.env` (ADMIN_LOGIN / ADMIN_PASSWORD)
-            </div>
-          </section>
-
-          <section className="panel">
-            <h3>Доступ</h3>
-            <p className="admin-muted">
-              Это закрытая зона управления контентом. После входа можно создавать, редактировать и удалять события и элементы галереи.
-            </p>
-            <div className="admin-divider" />
-            <p className="admin-muted">
-              Если backend недоступен или токен протух — вернём на эту страницу.
-            </p>
-          </section>
-        </div>
+        <section className="panel form">
+          <h3><Shield /> Авторизация</h3>
+          <input placeholder="Логин" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" />
+          <input placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" />
+          {error && <div className="admin-alert admin-alert-error">{error}</div>}
+          <button className="button button-lime" onClick={onSubmit} disabled={loading || !login || !password}>
+            {loading ? 'Входим…' : 'Войти'}
+          </button>
+        </section>
       </div>
     </main>
   );
 }
-

@@ -30,8 +30,13 @@ export default function EventsPage() {
       })
       .catch((e: ApiError) => {
         if (!active) return;
-        // если backend недоступен — показываем демо
-        setError(e?.status === 0 ? 'Backend недоступен' : 'Ошибка загрузки');
+        const msg =
+          e?.status === 0
+            ? 'Backend недоступен. Проверьте, что API запущен и nginx проксирует /api на Node.'
+            : e?.error === 'BAD_RESPONSE_NOT_JSON'
+              ? 'Сервер вернул не JSON (часто 502 или HTML вместо API).'
+              : `Ошибка загрузки${e?.status ? ` (${e.status})` : ''}${e?.error ? `: ${e.error}` : ''}`;
+        setError(msg);
         setEvents(defaultEvents);
       })
       .finally(() => active && setLoading(false));

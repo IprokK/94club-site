@@ -24,10 +24,7 @@ export const galleryController = {
     const { page, limit, skip, q } = parseListParams(req);
     const where = q
       ? {
-          OR: [
-            { title: { contains: q, mode: 'insensitive' } },
-            { tag: { contains: q, mode: 'insensitive' } }
-          ]
+          OR: [{ title: { contains: q } }, { tag: { contains: q } }]
         }
       : undefined;
 

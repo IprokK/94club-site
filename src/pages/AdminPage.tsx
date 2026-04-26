@@ -5,8 +5,11 @@ import { logout } from '../api/auth';
 import type { ApiError } from '../api/client';
 import { listEvents, createEvent, deleteEvent, updateEvent, type EventDto, type EventStatus } from '../api/events';
 import { listGallery, createGallery, deleteGallery, updateGallery, type GalleryDto } from '../api/gallery';
+import { getSiteSettings, updateSiteSettings, type SiteSettingsPublic } from '../api/settings';
+import { listJoinRequests, type JoinRequestDto } from '../api/join';
 import { uploadImage } from '../api/uploads';
 import Modal from '../components/Modal';
+import RaffleAdminTickets from '../components/raffle/RaffleAdminTickets';
 import { SectionTitle, Tag } from '../components/UI';
 
 const EVENT_STATUSES: { label: string; value: EventStatus }[] = [
@@ -18,6 +21,7 @@ const EVENT_STATUSES: { label: string; value: EventStatus }[] = [
 function apiErrorToText(err: unknown) {
   const e = err as Partial<ApiError>;
   if (e?.status === 401) return 'Сессия истекла. Войди снова.';
+  if (e?.error) return `Ошибка: ${e.error}${e.status ? ` (${e.status})` : ''}`;
   return 'Ошибка. Проверь backend и повтори.';
 }
 
@@ -71,6 +75,17 @@ export default function AdminPage() {
   const [galleryFile, setGalleryFile] = useState<File | null>(null);
   const [gallerySaving, setGallerySaving] = useState(false);
   const [galleryFormError, setGalleryFormError] = useState<string | null>(null);
+
+  const [calSettings, setCalSettings] = useState<SiteSettingsPublic>({ calendarLabel: 'календарь', calendarPath: '/events' });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
+  const [joinList, setJoinList] = useState<JoinRequestDto[]>([]);
+  const [joinTotal, setJoinTotal] = useState(0);
+  const [joinPage, setJoinPage] = useState(1);
+  const [joinLimit] = useState(8);
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -132,6 +147,53 @@ export default function AdminPage() {
     }
   };
 
+  const loadSettings = async () => {
+    setSettingsLoading(true);
+    try {
+      const s = await getSiteSettings();
+      setCalSettings(s);
+    } catch {
+      setToast({ kind: 'error', text: 'Не удалось загрузить настройки календаря' });
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const loadJoin = async () => {
+    setJoinError(null);
+    setJoinLoading(true);
+    try {
+      const res = await listJoinRequests({ page: joinPage, limit: joinLimit });
+      setJoinList(res.items);
+      setJoinTotal(res.total);
+    } catch (e) {
+      setJoinError(apiErrorToText(e));
+      if ((e as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  const saveCalendarSettings = async () => {
+    setSettingsSaving(true);
+    try {
+      const s = await updateSiteSettings({
+        calendarLabel: calSettings.calendarLabel.trim(),
+        calendarPath: calSettings.calendarPath.trim()
+      });
+      setCalSettings(s);
+      setToast({ kind: 'ok', text: 'Календарь на главной обновлён' });
+    } catch (e) {
+      setToast({ kind: 'error', text: apiErrorToText(e) });
+      if ((e as ApiError)?.status === 401) nav('/admin/login', { replace: true });
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
   useEffect(() => {
     loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,6 +202,10 @@ export default function AdminPage() {
     loadGallery();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryPage]);
+  useEffect(() => {
+    loadJoin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinPage]);
 
   const onLogout = () => {
     logout();
@@ -258,6 +324,7 @@ export default function AdminPage() {
 
   const eventsPages = Math.max(1, Math.ceil(eventsTotal / eventsLimit));
   const galleryPages = Math.max(1, Math.ceil(galleryTotal / galleryLimit));
+  const joinPages = Math.max(1, Math.ceil(joinTotal / joinLimit));
 
   const onSearchEvents = async () => {
     setEventsPage(1);
@@ -372,6 +439,81 @@ export default function AdminPage() {
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button className="button button-outline" onClick={() => setGalleryPage(Math.max(1, galleryPage - 1))} disabled={galleryPage <= 1}>Назад</button>
                     <button className="button button-outline" onClick={() => setGalleryPage(Math.min(galleryPages, galleryPage + 1))} disabled={galleryPage >= galleryPages}>Дальше</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+
+        <div className="admin-grid" style={{ marginTop: 22 }}>
+          <RaffleAdminTickets />
+
+          <section className="panel" style={{ gridColumn: '1 / -1' }}>
+            <h3>Календарь (кнопка на главной)</h3>
+            <p className="admin-muted" style={{ marginBottom: 14 }}>
+              Текст и внутренняя ссылка (начинается с /). Список мероприятий по-прежнему в разделе «События» ниже.
+            </p>
+            {settingsLoading ? (
+              <p className="admin-muted">Загрузка…</p>
+            ) : (
+              <div className="admin-split">
+                <input
+                  placeholder="Подпись, напр. «календарь»"
+                  value={calSettings.calendarLabel}
+                  onChange={(e) => setCalSettings({ ...calSettings, calendarLabel: e.target.value })}
+                />
+                <input
+                  placeholder="Путь, напр. /events или /#join"
+                  value={calSettings.calendarPath}
+                  onChange={(e) => setCalSettings({ ...calSettings, calendarPath: e.target.value })}
+                />
+              </div>
+            )}
+            <div className="admin-actions-row" style={{ justifyContent: 'flex-start' }}>
+              <button className="button button-lime" type="button" onClick={saveCalendarSettings} disabled={settingsSaving || settingsLoading}>
+                {settingsSaving ? 'Сохраняем…' : 'Сохранить'}
+              </button>
+            </div>
+          </section>
+
+          <section className="panel" style={{ gridColumn: '1 / -1' }}>
+            <h3>Заявки с главной</h3>
+            {joinError && <div className="admin-alert admin-alert-error">{joinError}</div>}
+            {joinLoading ? (
+              <p className="admin-muted">Загрузка…</p>
+            ) : joinList.length === 0 ? (
+              <p className="admin-muted">Пока нет заявок.</p>
+            ) : (
+              <>
+                {joinList.map((j) => (
+                  <div className="admin-row" key={j.id} style={{ display: 'block' }}>
+                    <div className="admin-mini" style={{ marginBottom: 6 }}>
+                      #{j.id} • {new Date(j.createdAt).toLocaleString('ru-RU')}
+                    </div>
+                    <b>{j.name}</b>
+                    <p className="admin-muted" style={{ margin: '6px 0' }}>
+                      {j.contact}
+                    </p>
+                    <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{j.message}</p>
+                  </div>
+                ))}
+                <div className="admin-pager">
+                  <span className="admin-mini">
+                    заявок: <b>{joinTotal}</b> • стр. <b>{joinPage}</b> / {joinPages}
+                  </span>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button className="button button-outline" type="button" onClick={() => setJoinPage((p) => Math.max(1, p - 1))} disabled={joinPage <= 1}>
+                      Назад
+                    </button>
+                    <button
+                      className="button button-outline"
+                      type="button"
+                      onClick={() => setJoinPage((p) => Math.min(joinPages, p + 1))}
+                      disabled={joinPage >= joinPages}
+                    >
+                      Дальше
+                    </button>
                   </div>
                 </div>
               </>

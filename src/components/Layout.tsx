@@ -1,5 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { Home, Info, CalendarDays, Image, Shield, Menu, X, Heart } from 'lucide-react';
+import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Home, Info, CalendarDays, Image, Menu, X, Heart } from 'lucide-react';
 import { useState } from 'react';
 import Logo94 from './Logo94';
 
@@ -7,8 +7,7 @@ const links = [
   { to: '/', label: 'Главная', icon: Home },
   { to: '/about', label: 'О клубе', icon: Info },
   { to: '/events', label: 'Мероприятия', icon: CalendarDays },
-  { to: '/gallery', label: 'Галерея', icon: Image },
-  { to: '/admin', label: 'Админ', icon: Shield }
+  { to: '/gallery', label: 'Галерея', icon: Image }
 ];
 
 function Navigation({ close }: { close?: () => void }) {
@@ -51,7 +50,15 @@ export default function Layout() {
       <footer className="footer">
         <div className="container footer-inner">
           <div className="footer-logo"><Logo94 compact /></div>
-          <div className="footer-line"><span>сообщество</span><i>•</i><span>рост</span><i>•</i><span>вдохновение</span></div>
+          <div className="footer-line">
+            <span>сообщество</span>
+            <i>•</i>
+            <span>рост</span>
+            <i>•</i>
+            <span>вдохновение</span>
+            <i>•</i>
+            <Link to="/admin/login" className="footer-admin-link">вход</Link>
+          </div>
           <div className="footer-heart"><Heart size={16} /> 94 Club — это твоя история</div>
         </div>
       </footer>

@@ -59,14 +59,21 @@ model Gallery {
 }
 
 model RaffleEntry {
-  id           Int      @id @default(autoincrement())
-  name         String
-  vk           String?  @unique
-  telegram     String?  @unique
-  ticketNumber String   @unique @map("ticket_number")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id        Int     @id @default(autoincrement())
+  name      String
+  nameKey   String  @unique @map("name_key")
+  vk        String
+  vkKey     String  @unique @map("vk_key")
+  telegram  String
+  tgKey     String  @unique @map("tg_key")
+  ticketNumber String @unique @map("ticket_number")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  winner       RaffleWinner?
+  conditionVkOk Boolean @default(false) @map("condition_vk_ok")
+  conditionTgOk Boolean @default(false) @map("condition_tg_ok")
+  verifiedNote  String? @map("verified_note")
+
+  winner RaffleWinner?
 
   @@index([createdAt])
   @@map("raffle_entries")
@@ -81,5 +88,25 @@ model RaffleWinner {
   entry     RaffleEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@map("raffle_winners")
+}
+
+model SiteSettings {
+  id            Int      @id @default(1)
+  calendarLabel String   @default("календарь") @map("calendar_label")
+  calendarPath  String   @default("/events") @map("calendar_path")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+model JoinRequest {
+  id        Int      @id @default(autoincrement())
+  name      String
+  contact   String
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("join_requests")
 }
 

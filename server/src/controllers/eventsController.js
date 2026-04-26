@@ -31,10 +31,10 @@ export const eventsController = {
     const where = q
       ? {
           OR: [
-            { title: { contains: q, mode: 'insensitive' } },
-            { category: { contains: q, mode: 'insensitive' } },
-            { location: { contains: q, mode: 'insensitive' } },
-            { description: { contains: q, mode: 'insensitive' } }
+            { title: { contains: q } },
+            { category: { contains: q } },
+            { location: { contains: q } },
+            { description: { contains: q } }
           ]
         }
       : undefined;

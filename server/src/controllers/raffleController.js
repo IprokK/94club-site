@@ -2,50 +2,173 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 
 const entryCreateSchema = z.object({
-  name: z.string().min(2).max(80),
-  vk: z.string().trim().min(2).max(120).optional().or(z.literal('')),
-  telegram: z.string().trim().min(2).max(120).optional().or(z.literal(''))
+  name: z.string().min(2).max(120),
+  vk: z.string().min(1).max(200),
+  telegram: z.string().min(1).max(200)
 });
+
+const entryPatchSchema = z
+  .object({
+    conditionVkOk: z.boolean().optional(),
+    conditionTgOk: z.boolean().optional(),
+    verifiedNote: z.union([z.string().max(800), z.null()]).optional()
+  })
+  .refine((v) => v.conditionVkOk !== undefined || v.conditionTgOk !== undefined || v.verifiedNote !== undefined, {
+    message: 'EMPTY_PATCH'
+  });
 
 function normalizeHandle(s) {
   const v = String(s || '').trim();
   return v ? v.replace(/^@/, '') : '';
 }
 
+/** Ключ ФИО: без лишних пробелов, нижний регистр */
+function normalizeFioKey(s) {
+  return String(s || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+/** Ключ VK: ник/путь без домена и лишнего */
+function normalizeVkKey(s) {
+  let v = normalizeHandle(s);
+  if (!v) return '';
+  v = v.toLowerCase();
+  v = v.replace(/^https?:\/\//, '');
+  v = v.replace(/^m\./, '');
+  v = v.replace(/^vk\.com\//, '');
+  v = v.replace(/^vkontakte\.ru\//, '');
+  v = v.split('?')[0].split('/')[0];
+  v = v.replace(/\/$/, '');
+  return v;
+}
+
+/** Ключ Telegram */
+function normalizeTgKey(s) {
+  let v = normalizeHandle(s).toLowerCase();
+  v = v.replace(/^https?:\/\//, '');
+  v = v.replace(/^t\.me\//, '');
+  v = v.split('?')[0].split('/')[0];
+  return v;
+}
+
 function formatTicket(id) {
   return `#${String(id).padStart(4, '0')}`;
 }
 
+function parseListParams(req) {
+  const page = Math.max(1, Number(req.query.page || 1) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit || 20) || 20));
+  const q = String(req.query.q || '').trim();
+  const skip = (page - 1) * limit;
+  return { page, limit, skip, q };
+}
+
+function entryToJson(e) {
+  return {
+    id: e.id,
+    name: e.name,
+    nameKey: e.nameKey,
+    vk: e.vk,
+    vkKey: e.vkKey,
+    telegram: e.telegram,
+    tgKey: e.tgKey,
+    ticketNumber: e.ticketNumber,
+    createdAt: e.createdAt,
+    conditionVkOk: e.conditionVkOk,
+    conditionTgOk: e.conditionTgOk,
+    verifiedNote: e.verifiedNote
+  };
+}
+
 export const raffleController = {
+  async listEntries(req, res) {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'FORBIDDEN' });
+    const { page, limit, skip, q } = parseListParams(req);
+    const where = q
+      ? {
+          OR: [
+            { name: { contains: q } },
+            { vk: { contains: q } },
+            { telegram: { contains: q } },
+            { ticketNumber: { contains: q } }
+          ]
+        }
+      : undefined;
+    const [items, total] = await Promise.all([
+      prisma.raffleEntry.findMany({ where, orderBy: { id: 'desc' }, skip, take: limit }),
+      prisma.raffleEntry.count({ where })
+    ]);
+    return res.json({
+      items: items.map(entryToJson),
+      page,
+      limit,
+      total,
+      pages: Math.max(1, Math.ceil(total / limit))
+    });
+  },
+
+  async patchEntry(req, res) {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'FORBIDDEN' });
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'BAD_ID' });
+    const parsed = entryPatchSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
+    const data = {};
+    if (parsed.data.conditionVkOk !== undefined) data.conditionVkOk = parsed.data.conditionVkOk;
+    if (parsed.data.conditionTgOk !== undefined) data.conditionTgOk = parsed.data.conditionTgOk;
+    if (parsed.data.verifiedNote !== undefined) data.verifiedNote = parsed.data.verifiedNote;
+    try {
+      const updated = await prisma.raffleEntry.update({ where: { id }, data });
+      return res.json(entryToJson(updated));
+    } catch {
+      return res.status(404).json({ error: 'NOT_FOUND' });
+    }
+  },
+
   async createEntry(req, res) {
     const parsed = entryCreateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
 
-    const name = parsed.data.name.trim();
-    const vk = normalizeHandle(parsed.data.vk);
-    const telegram = normalizeHandle(parsed.data.telegram);
+    const nameRaw = parsed.data.name.trim();
+    const vkRaw = parsed.data.vk.trim();
+    const tgRaw = parsed.data.telegram.trim();
 
-    if (!vk && !telegram) {
-      return res.status(400).json({ error: 'NEED_VK_OR_TELEGRAM' });
+    const nameKey = normalizeFioKey(nameRaw);
+    const vkKey = normalizeVkKey(vkRaw);
+    const tgKey = normalizeTgKey(tgRaw);
+
+    if (!nameKey || !vkKey || !tgKey) {
+      return res.status(400).json({ error: 'NEED_NAME_VK_TELEGRAM' });
     }
 
-    // 1 билет на пользователя (по vk или telegram)
-    const existing = await prisma.raffleEntry.findFirst({
-      where: {
-        OR: [
-          vk ? { vk } : undefined,
-          telegram ? { telegram } : undefined
-        ].filter(Boolean)
-      }
-    });
-    if (existing) {
-      return res.status(409).json({ error: 'ALREADY_HAS_TICKET', ticketNumber: existing.ticketNumber });
+    const dupName = await prisma.raffleEntry.findUnique({ where: { nameKey } });
+    if (dupName) {
+      return res.status(409).json({ error: 'DUPLICATE_NAME', ticketNumber: dupName.ticketNumber });
+    }
+    const dupVk = await prisma.raffleEntry.findUnique({ where: { vkKey } });
+    if (dupVk) {
+      return res.status(409).json({ error: 'DUPLICATE_VK', ticketNumber: dupVk.ticketNumber });
+    }
+    const dupTg = await prisma.raffleEntry.findUnique({ where: { tgKey } });
+    if (dupTg) {
+      return res.status(409).json({ error: 'DUPLICATE_TELEGRAM', ticketNumber: dupTg.ticketNumber });
     }
 
     const created = await prisma.$transaction(async (tx) => {
-      // временный ticketNumber, обновим после получения id
       const entry = await tx.raffleEntry.create({
-        data: { name, vk: vk || null, telegram: telegram || null, ticketNumber: 'PENDING' }
+        data: {
+          name: nameRaw,
+          nameKey,
+          vk: vkRaw,
+          vkKey,
+          telegram: tgRaw,
+          tgKey,
+          ticketNumber: 'PENDING',
+          conditionVkOk: false,
+          conditionTgOk: false
+        }
       });
       const ticketNumber = formatTicket(entry.id);
       return await tx.raffleEntry.update({
@@ -83,11 +206,12 @@ export const raffleController = {
   },
 
   async getStats(req, res) {
-    const [entries, winners] = await Promise.all([
+    const [entries, winners, eligible] = await Promise.all([
       prisma.raffleEntry.count(),
-      prisma.raffleWinner.count()
+      prisma.raffleWinner.count(),
+      prisma.raffleEntry.count({ where: { conditionVkOk: true, conditionTgOk: true } })
     ]);
-    res.json({ entries, winners });
+    res.json({ entries, winners, eligible });
   },
 
   async draw(req, res) {
@@ -101,12 +225,22 @@ export const raffleController = {
 
     const alreadyWinnerIds = (await prisma.raffleWinner.findMany({ select: { entryId: true } })).map((x) => x.entryId);
 
+    const baseWhere = {
+      conditionVkOk: true,
+      conditionTgOk: true
+    };
+    const where = alreadyWinnerIds.length
+      ? { ...baseWhere, id: { notIn: alreadyWinnerIds } }
+      : baseWhere;
+
     const pool = await prisma.raffleEntry.findMany({
-      where: alreadyWinnerIds.length ? { id: { notIn: alreadyWinnerIds } } : undefined,
+      where,
       select: { id: true }
     });
 
-    if (!pool.length) return res.status(409).json({ error: 'NO_ENTRIES_LEFT' });
+    if (!pool.length) {
+      return res.status(409).json({ error: 'NO_ELIGIBLE_ENTRIES' });
+    }
 
     const pick = pool[Math.floor(Math.random() * pool.length)];
 
@@ -126,4 +260,3 @@ export const raffleController = {
     });
   }
 };
-

@@ -12,10 +12,17 @@ function placeLabel(p: 1 | 2 | 3 | 4) {
 }
 
 function apiErrorToText(err: unknown) {
-  const e = err as Partial<ApiError>;
+  const e = err as Partial<ApiError> & { error?: string };
   if (e?.status === 401) return 'Нужна авторизация админа (JWT).';
   if (e?.status === 403) return 'Нет прав (role != admin).';
-  if (e?.status === 409) return 'Нельзя: место уже разыграно или нет участников.';
+  if (e?.status === 409) {
+    if (e.error === 'NO_ELIGIBLE_ENTRIES') {
+      return 'Нет участников с отмеченными обеими подписками (VK и Telegram). Проверь билеты в админке.';
+    }
+    if (e.error === 'PLACE_ALREADY_DRAWN') return 'Это место уже разыграно.';
+    if (e.error === 'NO_ENTRIES_LEFT') return 'Не осталось участников в пуле.';
+    return 'Нельзя провести розыгрыш (место занято или нет подходящих билетов).';
+  }
   return 'Ошибка розыгрыша.';
 }
 
@@ -81,6 +88,10 @@ export default function DrawMachine() {
 
   return (
     <div className="panel raffle-draw">
+      <div className="admin-alert admin-alert-ok" style={{ marginBottom: 14, textTransform: 'none', letterSpacing: 'normal' }}>
+        В розыгрыше только билеты с двумя галочками в админке (подписка VK и Telegram). Сначала проверьте участников в разделе «Розыгрыш — проверка билетов».
+      </div>
+
       <div className="raffle-draw-head">
         <div className="tag-row" style={{ marginBottom: 0 }}>
           <Tag>draw</Tag>
