@@ -53,7 +53,9 @@ app.use(
 app.use(express.json({ limit: '2mb' }));
 
 const uploadsDir = path.resolve(__dirname, '../uploads');
-app.use('/uploads', express.static(uploadsDir, { fallthrough: false }));
+// Важно: при fallthrough:false serve-static отдаёт 404 как "ошибку" в middleware.
+// Чтобы не превращать это в 500, оставляем fallthrough:true и обработаем 404 ниже.
+app.use('/uploads', express.static(uploadsDir, { fallthrough: true }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
@@ -72,10 +74,21 @@ if (SERVE_FRONTEND) {
   });
 }
 
+// 404 для API — в JSON, для остального — пустой 404.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'NOT_FOUND' });
+  return res.status(404).end();
+});
+
 app.use((err, req, res, next) => {
   // eslint-disable-next-line no-console
   console.error(err);
-  res.status(500).json({ error: 'INTERNAL_ERROR' });
+  const status = Number(err?.status || err?.statusCode) || 500;
+  if (status === 404) {
+    if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'NOT_FOUND' });
+    return res.status(404).end();
+  }
+  res.status(status).json({ error: 'INTERNAL_ERROR' });
 });
 
 async function main() {
