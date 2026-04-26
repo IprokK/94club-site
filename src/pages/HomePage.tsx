@@ -1,10 +1,45 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CalendarDays, Gift, Heart, Mail, Medal, Rocket, Send, Sparkles } from 'lucide-react';
+import type { ApiError } from '../api/client';
+import { listEvents } from '../api/events';
 import Logo94 from '../components/Logo94';
 import { AccentStripes, Tag } from '../components/UI';
 
+function activitiesWord(n: number): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m100 >= 11 && m100 <= 14) return 'активностей';
+  if (m10 === 1) return 'активность';
+  if (m10 >= 2 && m10 <= 4) return 'активности';
+  return 'активностей';
+}
+
 export default function HomePage() {
+  const [eventsTotal, setEventsTotal] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    listEvents({ page: 1, limit: 1, q: '' })
+      .then((res) => {
+        if (!active) return;
+        setEventsTotal(res.total);
+      })
+      .catch((_e: ApiError) => {
+        if (!active) return;
+        setEventsTotal(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activitiesLine = useMemo(() => {
+    if (eventsTotal === null) return { n: '—', t: 'активностей' };
+    return { n: String(eventsTotal), t: activitiesWord(eventsTotal) };
+  }, [eventsTotal]);
+
   return (
     <main>
       <section className="section-pad">
@@ -33,11 +68,11 @@ export default function HomePage() {
             </div>
             <div className="home-mag-stats">
               {[
-                { n: '100+', t: 'участников' },
-                { n: '5', t: 'активностей' },
-                { n: '∞', t: 'эмоций' }
+                { k: 'members', n: '100+', t: 'участников мероприятий' },
+                { k: 'activities', n: activitiesLine.n, t: activitiesLine.t },
+                { k: 'emotions', n: '∞', t: 'эмоций' }
               ].map((s) => (
-                <div key={s.t} className="home-mag-stat">
+                <div key={s.k} className="home-mag-stat">
                   <b>{s.n}</b>
                   <span>{s.t}</span>
                 </div>
