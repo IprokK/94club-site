@@ -58,3 +58,28 @@ model Gallery {
   @@map("gallery")
 }
 
+model RaffleEntry {
+  id           Int      @id @default(autoincrement())
+  name         String
+  vk           String?  @unique
+  telegram     String?  @unique
+  ticketNumber String   @unique @map("ticket_number")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  winner       RaffleWinner?
+
+  @@index([createdAt])
+  @@map("raffle_entries")
+}
+
+model RaffleWinner {
+  id        Int        @id @default(autoincrement())
+  entryId   Int        @unique @map("entry_id")
+  place     Int        @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  entry     RaffleEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("raffle_winners")
+}
+

@@ -66,6 +66,37 @@ button, input, textarea { font: inherit; }
 .home-mag-quote { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 18px; }
 .home-mag-quote p { margin: 10px 0 0; font-size: 26px; text-transform: uppercase; font-weight: 900; line-height: 1.1; }
 .home-mag-quote b { color: var(--lime); }
+.raffle-announce { padding: 28px; }
+.raffle-announce-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.raffle-announce-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.raffle-title { margin: 10px 0 0; font-size: clamp(30px, 4vw, 52px); text-transform: uppercase; line-height: .95; }
+.raffle-prizes { margin-top: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.raffle-prize { border: 1px solid var(--line); background: rgba(0,0,0,.38); overflow: hidden; }
+.raffle-prize-meta { padding: 14px 14px 0; }
+.raffle-prize-meta b { display: block; color: var(--lime); text-transform: uppercase; letter-spacing: .14em; font-size: 12px; }
+.raffle-prize-meta span { display: block; margin-top: 8px; font-size: 22px; text-transform: uppercase; font-weight: 950; letter-spacing: -.03em; }
+.raffle-prize-img { border-top: 1px solid var(--line); background: #0a0a0a; height: 150px; }
+.raffle-prize-img img { width: 100%; height: 100%; object-fit: cover; opacity: .92; filter: saturate(1.08) contrast(1.05); }
+
+.raffle-side { display: grid; gap: 14px; }
+.raffle-result { display: grid; gap: 14px; }
+.raffle-ticket { position: relative; overflow: hidden; background: radial-gradient(circle at top, rgba(255,255,255,.12), transparent 34%), linear-gradient(135deg,#111,#020202); }
+.raffle-ticket:before { content: ''; position: absolute; left: 62px; top: 54px; height: 260px; width: 5px; transform: rotate(20deg); background: var(--pink); box-shadow: 0 0 24px rgba(255,45,85,.8); }
+.raffle-ticket-top { display: flex; gap: 10px; flex-wrap: wrap; }
+.raffle-ticket-num { margin-top: 18px; font-size: clamp(64px, 7vw, 104px); font-weight: 950; letter-spacing: -.06em; text-transform: uppercase; color: var(--lime); line-height: .9; }
+.raffle-ticket-name { margin-top: 10px; font-size: clamp(26px, 3.6vw, 44px); font-weight: 950; letter-spacing: -.04em; text-transform: uppercase; }
+.raffle-ticket-foot { margin-top: 18px; color: rgba(255,255,255,.62); text-transform: uppercase; letter-spacing: .18em; font-weight: 900; font-size: 12px; }
+
+.raffle-draw { display: grid; gap: 14px; }
+.raffle-draw-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.raffle-draw-meta b { text-transform: uppercase; letter-spacing: .14em; }
+.raffle-slot { border: 1px solid var(--line); background: rgba(0,0,0,.38); padding: 18px; }
+.raffle-slot-num { font-size: clamp(54px, 7vw, 96px); font-weight: 950; letter-spacing: -.06em; color: var(--lime); line-height: .9; }
+.raffle-slot-sub { margin-top: 10px; color: rgba(255,255,255,.62); text-transform: uppercase; letter-spacing: .14em; font-size: 12px; }
+.raffle-winners-grid { margin-top: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.raffle-winner-card { border: 1px solid var(--line); background: rgba(0,0,0,.38); padding: 16px; }
+.raffle-winner-card b { display: block; color: var(--lime); text-transform: uppercase; letter-spacing: .14em; font-size: 12px; }
+.raffle-winner-card span { display: block; margin-top: 10px; text-transform: uppercase; letter-spacing: .12em; font-size: 12px; color: rgba(255,255,255,.72); }
 .tag-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
 .tag { display: inline-flex; width: max-content; align-items: center; border: 1px solid; padding: 6px 10px; text-transform: uppercase; letter-spacing: .18em; font-size: 11px; font-weight: 800; background: rgba(255,255,255,.03); }
 .tag-lime { color: var(--lime); border-color: rgba(217,255,0,.4); background: rgba(217,255,0,.08); }
@@ -195,6 +226,7 @@ input:focus, textarea:focus { border-color: var(--lime); }
   .gallery-grid { grid-template-columns: repeat(2,1fr); }
   .home-mag-row { grid-template-columns: 90px 1fr; }
   .home-mag-media { display: none; }
+  .raffle-prizes { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 720px) {
   .container { width: min(100% - 24px, 1240px); }
@@ -210,4 +242,6 @@ input:focus, textarea:focus { border-color: var(--lime); }
   .home-mag-num { justify-content: flex-start; padding: 20px 24px; border-right: 0; border-bottom: 1px solid var(--line); }
   .home-mag-row { grid-template-columns: 1fr; }
   .home-mag-qr-grid { grid-template-columns: 1fr; }
+  .raffle-prizes { grid-template-columns: 1fr; }
+  .raffle-winners-grid { grid-template-columns: 1fr; }
 }

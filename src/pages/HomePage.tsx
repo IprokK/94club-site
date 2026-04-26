@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CalendarDays, Mail, Rocket, Send, Sparkles } from 'lucide-react';
+import { CalendarDays, Gift, Mail, Rocket, Send, Sparkles } from 'lucide-react';
 import Logo94 from '../components/Logo94';
 import { AccentStripes, Tag } from '../components/UI';
 
@@ -21,7 +21,7 @@ export default function HomePage() {
               Мы создаём события, которые вдохновляют, объединяют и дают новые возможности.
             </p>
             <div className="hero-actions">
-              <Link className="button button-lime" to="/join">Вступить в клуб</Link>
+              <Link className="button button-lime" to="/#join">Вступить в клуб</Link>
               <Link className="button button-outline" to="/events">Смотреть события</Link>
             </div>
             <AccentStripes />
@@ -51,10 +51,51 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="section-pad border-top">
+        <div className="container">
+          <div className="panel raffle-announce">
+            <div className="raffle-announce-head">
+              <div>
+                <div className="tag-row">
+                  <Tag><Gift size={14} /> raffle</Tag>
+                  <Tag color="pink">4 места</Tag>
+                  <Tag color="white">билет • мерч • призы</Tag>
+                </div>
+                <h3 className="raffle-title">Розыгрыш 94 Club</h3>
+                <p className="admin-muted">Оставь заявку, получи номер билета и участвуй в розыгрыше. Один билет на человека (VK или Telegram).</p>
+              </div>
+              <div className="raffle-announce-actions">
+                <Link className="button button-lime" to="/raffle">Получить билет</Link>
+                <Link className="button button-outline" to="/raffle/draw">Розыгрыш (админ)</Link>
+              </div>
+            </div>
+
+            <div className="raffle-prizes">
+              {[
+                { place: '🥇 1 место', title: 'Билет', img: '/assets/raffle-ticket.png' },
+                { place: '🥈 2 место', title: 'Футболка', img: '/assets/raffle-tshirt.png' },
+                { place: '🥉 3 место', title: 'Брелок', img: '/assets/raffle-keychain.png' },
+                { place: '🎁 4 место', title: 'Стикеры', img: '/assets/raffle-stickers.png' }
+              ].map((p) => (
+                <div key={p.title} className="raffle-prize">
+                  <div className="raffle-prize-meta">
+                    <b>{p.place}</b>
+                    <span>{p.title}</span>
+                  </div>
+                  <div className="raffle-prize-img">
+                    <img src={p.img} alt={p.title} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* блок событий с главной убран; страница "Мероприятия" остаётся отдельной */}
 
       <section className="section-pad border-top">
-        <div className="container home-mag-footer">
+        <div className="container home-mag-footer" id="join">
           <div className="cta-lime">
             <h3>Не жди особенного момента. <span>Создавай его вместе с нами.</span></h3>
             <p>Подписывайся на анонсы, приходи на мероприятия, участвуй в организации и становись частью 94 Club.</p>

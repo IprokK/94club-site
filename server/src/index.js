@@ -10,6 +10,7 @@ import { createAuthRouter } from './routes/auth.js';
 import { createEventsRouter } from './routes/events.js';
 import { createGalleryRouter } from './routes/gallery.js';
 import { createUploadsRouter } from './routes/uploads.js';
+import { createRaffleRouter } from './routes/raffle.js';
 import { ensureAdminUser } from './bootstrap/ensureAdmin.js';
 import { prisma } from './lib/prisma.js';
 
@@ -65,6 +66,7 @@ const requireAuth = authRequired({ jwtSecret: JWT_SECRET });
 app.use('/api/events', requireAuth, createEventsRouter());
 app.use('/api/gallery', requireAuth, createGalleryRouter());
 app.use('/api/uploads', requireAuth, createUploadsRouter({ uploadsDir, publicBaseUrl: PUBLIC_BASE_URL }));
+app.use('/api/raffle', createRaffleRouter({ requireAuth }));
 
 if (SERVE_FRONTEND) {
   const distDir = path.resolve(__dirname, '../../dist');
