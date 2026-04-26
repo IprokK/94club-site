@@ -28,7 +28,12 @@ export function createUploadsRouter({ uploadsDir, publicBaseUrl }) {
 
   router.post('/', upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'NO_FILE' });
-    const url = `${publicBaseUrl}/uploads/${req.file.filename}`;
+    // Если backend обслуживает несколько доменов, лучше строить URL от запроса.
+    // Nginx должен прокидывать X-Forwarded-Proto.
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    const base = publicBaseUrl || (host ? `${proto}://${host}` : '');
+    const url = base ? `${base}/uploads/${req.file.filename}` : `/uploads/${req.file.filename}`;
     res.status(201).json({ url });
   });
 
