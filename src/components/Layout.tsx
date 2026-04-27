@@ -3,11 +3,15 @@ import { Home, Info, CalendarDays, Image, Menu, X, Heart } from 'lucide-react';
 import { useState } from 'react';
 import Logo94 from './Logo94';
 
-const links = [
+/*const links = [
   { to: '/', label: 'Главная', icon: Home },
   { to: '/about', label: 'О клубе', icon: Info },
   { to: '/events', label: 'Мероприятия', icon: CalendarDays },
   { to: '/gallery', label: 'Галерея', icon: Image }
+];*/
+
+const links = [
+  { to: '/', label: 'Главная', icon: Home },
 ];
 
 function Navigation({ close }: { close?: () => void }) {

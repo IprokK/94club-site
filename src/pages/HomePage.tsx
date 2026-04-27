@@ -147,7 +147,6 @@ export default function HomePage() {
                 </p>
                 <div className="raffle-poster-actions">
                   <Link className="button button-lime" to="/raffle">Получить билет</Link>
-                  <Link className="button button-outline-pink" to="/raffle/draw">Розыгрыш (админ)</Link>
                 </div>
               </div>
             </div>
