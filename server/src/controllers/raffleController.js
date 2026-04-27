@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 
@@ -53,8 +54,23 @@ function normalizeTgKey(s) {
   return v;
 }
 
-function formatTicket(id) {
-  return `#${String(id).padStart(4, '0')}`;
+const TICKET_MIN = 1;
+const TICKET_MAX = 9999;
+const TICKET_GENERATION_ATTEMPTS = 40;
+
+function formatTicket(n) {
+  return `#${String(n).padStart(4, '0')}`;
+}
+
+function makeRandomTicketNumber() {
+  return formatTicket(randomInt(TICKET_MIN, TICKET_MAX + 1));
+}
+
+function isTicketNumberConflict(error) {
+  if (error?.code !== 'P2002') return false;
+  const target = error?.meta?.target;
+  if (Array.isArray(target)) return target.includes('ticketNumber') || target.includes('ticket_number');
+  return String(target || '').includes('ticketNumber') || String(target || '').includes('ticket_number');
 }
 
 function parseListParams(req) {
@@ -156,26 +172,44 @@ export const raffleController = {
       return res.status(409).json({ error: 'DUPLICATE_TELEGRAM', ticketNumber: dupTg.ticketNumber });
     }
 
-    const created = await prisma.$transaction(async (tx) => {
-      const entry = await tx.raffleEntry.create({
-        data: {
-          name: nameRaw,
-          nameKey,
-          vk: vkRaw,
-          vkKey,
-          telegram: tgRaw,
-          tgKey,
-          ticketNumber: 'PENDING',
-          conditionVkOk: false,
-          conditionTgOk: false
+    let created;
+    try {
+      created = await prisma.$transaction(async (tx) => {
+        for (let attempt = 0; attempt < TICKET_GENERATION_ATTEMPTS; attempt += 1) {
+          const ticketNumber = makeRandomTicketNumber();
+          const existingTicket = await tx.raffleEntry.findUnique({
+            where: { ticketNumber },
+            select: { id: true }
+          });
+          if (existingTicket) continue;
+
+          try {
+            return await tx.raffleEntry.create({
+              data: {
+                name: nameRaw,
+                nameKey,
+                vk: vkRaw,
+                vkKey,
+                telegram: tgRaw,
+                tgKey,
+                ticketNumber,
+                conditionVkOk: false,
+                conditionTgOk: false
+              }
+            });
+          } catch (error) {
+            if (isTicketNumberConflict(error)) continue;
+            throw error;
+          }
         }
+        throw new Error('TICKET_POOL_EXHAUSTED');
       });
-      const ticketNumber = formatTicket(entry.id);
-      return await tx.raffleEntry.update({
-        where: { id: entry.id },
-        data: { ticketNumber }
-      });
-    });
+    } catch (error) {
+      if (error?.message === 'TICKET_POOL_EXHAUSTED') {
+        return res.status(409).json({ error: 'NO_FREE_TICKET_NUMBERS' });
+      }
+      throw error;
+    }
 
     return res.status(201).json({
       id: created.id,
