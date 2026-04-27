@@ -56,14 +56,35 @@ function normalizeTgKey(s) {
 
 const TICKET_MIN = 1;
 const TICKET_MAX = 9999;
-const TICKET_GENERATION_ATTEMPTS = 40;
+const TICKET_GENERATION_ATTEMPTS = 250;
 
 function formatTicket(n) {
   return `#${String(n).padStart(4, '0')}`;
 }
 
-function makeRandomTicketNumber() {
-  return formatTicket(randomInt(TICKET_MIN, TICKET_MAX + 1));
+function makePrettyTicketNumber() {
+  // "Красивые" номера:
+  // - одинаковые цифры: 1111..9999
+  // - зеркальные (палиндром 4 цифры): ABBA, включая ведущий 0 (например, 0110)
+  //
+  // Важно: ticketNumber хранится как строка, но форматируем строго 4 цифры.
+  const pick = randomInt(0, 10);
+
+  // ~20% — одинаковые цифры
+  if (pick < 2) {
+    const d = randomInt(1, 10); // 1..9 (0000 запрещаем)
+    return formatTicket(Number(`${d}${d}${d}${d}`));
+  }
+
+  // ~80% — палиндром ABBA (00..99), кроме 0000
+  while (true) {
+    const a = randomInt(0, 10);
+    const b = randomInt(0, 10);
+    if (a === 0 && b === 0) continue; // 0000
+    const n = Number(`${a}${b}${b}${a}`);
+    if (n < TICKET_MIN || n > TICKET_MAX) continue;
+    return formatTicket(n);
+  }
 }
 
 function isTicketNumberConflict(error) {
@@ -176,7 +197,7 @@ export const raffleController = {
     try {
       created = await prisma.$transaction(async (tx) => {
         for (let attempt = 0; attempt < TICKET_GENERATION_ATTEMPTS; attempt += 1) {
-          const ticketNumber = makeRandomTicketNumber();
+          const ticketNumber = makePrettyTicketNumber();
           const existingTicket = await tx.raffleEntry.findUnique({
             where: { ticketNumber },
             select: { id: true }
