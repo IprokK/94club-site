@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { normalizeTgKey, normalizeVkKey } from '../lib/raffleIdentityKeys.js';
 
 const entryCreateSchema = z.object({
   name: z.string().min(2).max(120),
@@ -18,40 +19,12 @@ const entryPatchSchema = z
     message: 'EMPTY_PATCH'
   });
 
-function normalizeHandle(s) {
-  const v = String(s || '').trim();
-  return v ? v.replace(/^@/, '') : '';
-}
-
 /** Ключ ФИО: без лишних пробелов, нижний регистр */
 function normalizeFioKey(s) {
   return String(s || '')
     .trim()
     .replace(/\s+/g, ' ')
     .toLowerCase();
-}
-
-/** Ключ VK: ник/путь без домена и лишнего */
-function normalizeVkKey(s) {
-  let v = normalizeHandle(s);
-  if (!v) return '';
-  v = v.toLowerCase();
-  v = v.replace(/^https?:\/\//, '');
-  v = v.replace(/^m\./, '');
-  v = v.replace(/^vk\.com\//, '');
-  v = v.replace(/^vkontakte\.ru\//, '');
-  v = v.split('?')[0].split('/')[0];
-  v = v.replace(/\/$/, '');
-  return v;
-}
-
-/** Ключ Telegram */
-function normalizeTgKey(s) {
-  let v = normalizeHandle(s).toLowerCase();
-  v = v.replace(/^https?:\/\//, '');
-  v = v.replace(/^t\.me\//, '');
-  v = v.split('?')[0].split('/')[0];
-  return v;
 }
 
 const TICKET_MIN = 1;
@@ -122,6 +95,20 @@ function entryToJson(e) {
   };
 }
 
+/** Ответ публичной формы розыгрыша (без админ-полей). При повторе VK/TG — флаг alreadyHadTicket. */
+function entryToPublicJson(entry, { recovered = false } = {}) {
+  const o = {
+    id: entry.id,
+    name: entry.name,
+    vk: entry.vk,
+    telegram: entry.telegram,
+    ticketNumber: entry.ticketNumber,
+    createdAt: entry.createdAt
+  };
+  if (recovered) o.alreadyHadTicket = true;
+  return o;
+}
+
 export const raffleController = {
   async listEntries(req, res) {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'FORBIDDEN' });
@@ -179,21 +166,27 @@ export const raffleController = {
     const vkKey = normalizeVkKey(vkRaw);
     const tgKey = normalizeTgKey(tgRaw);
 
-    if (!nameKey || !vkKey || !tgKey) {
+    if (!nameKey) {
       return res.status(400).json({ error: 'NEED_NAME_VK_TELEGRAM' });
     }
-
-    const dupName = await prisma.raffleEntry.findUnique({ where: { nameKey } });
-    if (dupName) {
-      return res.status(409).json({ error: 'DUPLICATE_NAME', ticketNumber: dupName.ticketNumber });
+    if (!vkKey) {
+      return res.status(400).json({ error: 'NEED_VK_PROFILE_URL' });
     }
+    if (!tgKey) {
+      return res.status(400).json({ error: 'NEED_TELEGRAM_HANDLE' });
+    }
+
     const dupVk = await prisma.raffleEntry.findUnique({ where: { vkKey } });
     if (dupVk) {
-      return res.status(409).json({ error: 'DUPLICATE_VK', ticketNumber: dupVk.ticketNumber });
+      return res.status(200).json(entryToPublicJson(dupVk, { recovered: true }));
     }
     const dupTg = await prisma.raffleEntry.findUnique({ where: { tgKey } });
     if (dupTg) {
-      return res.status(409).json({ error: 'DUPLICATE_TELEGRAM', ticketNumber: dupTg.ticketNumber });
+      return res.status(200).json(entryToPublicJson(dupTg, { recovered: true }));
+    }
+    const dupName = await prisma.raffleEntry.findUnique({ where: { nameKey } });
+    if (dupName) {
+      return res.status(409).json({ error: 'DUPLICATE_NAME', ticketNumber: dupName.ticketNumber });
     }
 
     let created;
@@ -238,26 +231,19 @@ export const raffleController = {
       }
       // Два параллельных запроса с тем же VK обходят findUnique, но ловятся уникальным индексом.
       if (error?.code === 'P2002') {
-        const [byName, byVk, byTg] = await Promise.all([
-          prisma.raffleEntry.findUnique({ where: { nameKey } }),
+        const [byVk, byTg, byName] = await Promise.all([
           prisma.raffleEntry.findUnique({ where: { vkKey } }),
-          prisma.raffleEntry.findUnique({ where: { tgKey } })
+          prisma.raffleEntry.findUnique({ where: { tgKey } }),
+          prisma.raffleEntry.findUnique({ where: { nameKey } })
         ]);
+        if (byVk) return res.status(200).json(entryToPublicJson(byVk, { recovered: true }));
+        if (byTg) return res.status(200).json(entryToPublicJson(byTg, { recovered: true }));
         if (byName) return res.status(409).json({ error: 'DUPLICATE_NAME', ticketNumber: byName.ticketNumber });
-        if (byVk) return res.status(409).json({ error: 'DUPLICATE_VK', ticketNumber: byVk.ticketNumber });
-        if (byTg) return res.status(409).json({ error: 'DUPLICATE_TELEGRAM', ticketNumber: byTg.ticketNumber });
       }
       throw error;
     }
 
-    return res.status(201).json({
-      id: created.id,
-      name: created.name,
-      vk: created.vk,
-      telegram: created.telegram,
-      ticketNumber: created.ticketNumber,
-      createdAt: created.createdAt
-    });
+    return res.status(201).json(entryToPublicJson(created));
   },
 
   async getWinners(req, res) {

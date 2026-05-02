@@ -9,6 +9,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
+    "recompute:raffle-keys": "node scripts/recompute-raffle-identity-keys.js",
     "pm2:start": "pm2 start ecosystem.config.cjs --env production",
     "pm2:restart": "pm2 restart 94club-api",
     "pm2:logs": "pm2 logs 94club-api",

@@ -2,7 +2,11 @@ import { motion } from 'framer-motion';
 import type { RaffleEntry } from '../../api/raffle';
 import { Tag } from '../UI';
 
-export default function TicketCard({ entry }: { entry: Pick<RaffleEntry, 'ticketNumber' | 'name'> }) {
+export default function TicketCard({
+  entry
+}: {
+  entry: Pick<RaffleEntry, 'ticketNumber' | 'name' | 'alreadyHadTicket'>;
+}) {
   return (
     <motion.div
       className="raffle-ticket panel"
@@ -16,6 +20,9 @@ export default function TicketCard({ entry }: { entry: Pick<RaffleEntry, 'ticket
       </div>
       <div className="raffle-ticket-num">{entry.ticketNumber}</div>
       <div className="raffle-ticket-name">{entry.name}</div>
+      {entry.alreadyHadTicket ? (
+        <p className="raffle-ticket-note">Билет уже был выдан ранее — показываем тот же номер.</p>
+      ) : null}
       <div className="raffle-ticket-foot">94 Club Raffle</div>
     </motion.div>
   );

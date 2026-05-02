@@ -8,6 +8,8 @@ export type RaffleEntry = {
   telegram: string;
   ticketNumber: string;
   createdAt: string;
+  /** Сервер вернул существующую запись (тот же VK или Telegram), без новой регистрации */
+  alreadyHadTicket?: boolean;
 };
 
 export type RaffleEntryAdmin = {
