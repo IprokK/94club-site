@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import type { ApiError } from '../../api/client';
 import { createRaffleEntry, type RaffleEntry } from '../../api/raffle';
@@ -6,15 +6,18 @@ import { createRaffleEntry, type RaffleEntry } from '../../api/raffle';
 function errorToText(err: unknown) {
   const e = err as Partial<ApiError> & { ticketNumber?: string };
   if (e?.status === 409 && e.ticketNumber && e.error === 'DUPLICATE_NAME') {
-    return `Это ФИО уже зарегистрировано (билет ${e.ticketNumber}).`;
+    return `Это ФИО уже в розыгрыше (билет ${e.ticketNumber} — уже выданная запись).`;
   }
   if (e?.status === 409 && e.ticketNumber && e.error === 'DUPLICATE_VK') {
-    return `Этот VK уже использован (билет ${e.ticketNumber}).`;
+    return `Этот VK уже зарегистрирован: билет ${e.ticketNumber} — это номер старой записи в базе, не «новый» билет под текущие правила номеров.`;
   }
   if (e?.status === 409 && e.ticketNumber && e.error === 'DUPLICATE_TELEGRAM') {
-    return `Этот Telegram уже использован (билет ${e.ticketNumber}).`;
+    return `Этот Telegram уже зарегистрирован (билет ${e.ticketNumber} — уже выданная запись).`;
   }
-  if (e?.status === 409 && e.ticketNumber) return `У тебя уже есть билет ${e.ticketNumber}`;
+  if (e?.status === 409 && e.ticketNumber) return `Уже есть билет ${e.ticketNumber} по этим данным.`;
+  if (e?.status === 409 && e.error === 'NO_FREE_TICKET_NUMBERS') {
+    return 'Свободных номеров билетов не осталось. Напиши организаторам.';
+  }
   if (e?.status === 409) return 'Такой участник уже зарегистрирован.';
   if (e?.error === 'NEED_NAME_VK_TELEGRAM' || e?.status === 400) {
     return 'Укажи ФИО, VK и Telegram.';
@@ -33,13 +36,17 @@ export default function RaffleForm({
   const [telegram, setTelegram] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Защита от двойного клика до первого ре-рендера (loading ещё false в двух вызовах подряд). */
+  const submitLockRef = useRef(false);
 
   const submit = async () => {
+    if (submitLockRef.current) return;
     setError(null);
     if (!name.trim() || !vk.trim() || !telegram.trim()) {
       setError('Заполни ФИО, VK и Telegram.');
       return;
     }
+    submitLockRef.current = true;
     setLoading(true);
     try {
       const entry = await createRaffleEntry({ name: name.trim(), vk: vk.trim(), telegram: telegram.trim() });
@@ -47,6 +54,7 @@ export default function RaffleForm({
     } catch (e) {
       setError(errorToText(e));
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };

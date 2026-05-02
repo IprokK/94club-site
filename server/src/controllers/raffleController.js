@@ -56,7 +56,10 @@ function normalizeTgKey(s) {
 
 const TICKET_MIN = 1;
 const TICKET_MAX = 9999;
-const TICKET_GENERATION_ATTEMPTS = 250;
+/** Сначала пробуем только «красивые» (ABBA / четыре одинаковые цифры). */
+const TICKET_PRETTY_ATTEMPTS = 250;
+/** Если мест в этом подмножестве не хватает или номера заняты старыми записями — любой свободный 0001–9999. */
+const TICKET_ANY_ATTEMPTS = 600;
 
 function formatTicket(n) {
   return `#${String(n).padStart(4, '0')}`;
@@ -196,8 +199,12 @@ export const raffleController = {
     let created;
     try {
       created = await prisma.$transaction(async (tx) => {
-        for (let attempt = 0; attempt < TICKET_GENERATION_ATTEMPTS; attempt += 1) {
-          const ticketNumber = makePrettyTicketNumber();
+        const maxAttempts = TICKET_PRETTY_ATTEMPTS + TICKET_ANY_ATTEMPTS;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          const ticketNumber =
+            attempt < TICKET_PRETTY_ATTEMPTS
+              ? makePrettyTicketNumber()
+              : formatTicket(randomInt(TICKET_MIN, TICKET_MAX + 1));
           const existingTicket = await tx.raffleEntry.findUnique({
             where: { ticketNumber },
             select: { id: true }
@@ -228,6 +235,17 @@ export const raffleController = {
     } catch (error) {
       if (error?.message === 'TICKET_POOL_EXHAUSTED') {
         return res.status(409).json({ error: 'NO_FREE_TICKET_NUMBERS' });
+      }
+      // Два параллельных запроса с тем же VK обходят findUnique, но ловятся уникальным индексом.
+      if (error?.code === 'P2002') {
+        const [byName, byVk, byTg] = await Promise.all([
+          prisma.raffleEntry.findUnique({ where: { nameKey } }),
+          prisma.raffleEntry.findUnique({ where: { vkKey } }),
+          prisma.raffleEntry.findUnique({ where: { tgKey } })
+        ]);
+        if (byName) return res.status(409).json({ error: 'DUPLICATE_NAME', ticketNumber: byName.ticketNumber });
+        if (byVk) return res.status(409).json({ error: 'DUPLICATE_VK', ticketNumber: byVk.ticketNumber });
+        if (byTg) return res.status(409).json({ error: 'DUPLICATE_TELEGRAM', ticketNumber: byTg.ticketNumber });
       }
       throw error;
     }
