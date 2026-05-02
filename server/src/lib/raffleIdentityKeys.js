@@ -59,12 +59,15 @@ export function normalizeVkKey(s) {
   const fromPlainString = () => {
     let v = raw.replace(/^https?:\/\//, '');
     v = v.replace(/^m\./, '');
-    v = v.replace(/^vk\.com\//, '').replace(/^vkontakte\.ru\//, '');
+    v = v
+      .replace(/^vk\.com\//, '')
+      .replace(/^vk\.ru\//, '')
+      .replace(/^vkontakte\.ru\//, '');
     const parts = v.split('?')[0].split('/').filter(Boolean);
     return parts[0] || '';
   };
 
-  const looksLikeVkUrl = /vk\.com|vkontakte\.ru|^\s*https?:\/\//i.test(raw);
+  const looksLikeVkUrl = /vk\.com|vk\.ru|vkontakte\.ru|^\s*https?:\/\//i.test(raw);
 
   if (!looksLikeVkUrl) {
     return fromPlainString();
@@ -74,7 +77,9 @@ export function normalizeVkKey(s) {
     const urlStr = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
     const u = new URL(urlStr);
     const host = u.hostname.replace(/^m\./, '');
-    if (!host.endsWith('vk.com') && !host.endsWith('vkontakte.ru')) {
+    const isVkHost =
+      host.endsWith('vk.com') || host.endsWith('vkontakte.ru') || host.endsWith('vk.ru');
+    if (!isVkHost) {
       return fromPlainString();
     }
 

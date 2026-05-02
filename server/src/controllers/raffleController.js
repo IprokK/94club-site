@@ -3,6 +3,19 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { normalizeTgKey, normalizeVkKey } from '../lib/raffleIdentityKeys.js';
 
+/** Ключи сообщества VK / канала TG (через запятую в RAFFLE_BLOCKED_VK_KEYS / RAFFLE_BLOCKED_TG_KEYS), чтобы не принимать «общую» ссылку клуба как личную */
+function parseCommaBlockedKeys(raw) {
+  return new Set(
+    String(raw ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+const RAFFLE_BLOCKED_VK_KEYS = parseCommaBlockedKeys(process.env.RAFFLE_BLOCKED_VK_KEYS);
+const RAFFLE_BLOCKED_TG_KEYS = parseCommaBlockedKeys(process.env.RAFFLE_BLOCKED_TG_KEYS);
+
 const entryCreateSchema = z.object({
   name: z.string().min(2).max(120),
   vk: z.string().min(1).max(200),
@@ -25,6 +38,11 @@ function normalizeFioKey(s) {
     .trim()
     .replace(/\s+/g, ' ')
     .toLowerCase();
+}
+
+/** Возврат «того же билета» только если совпали все три ключа — иначе можно выдать чужую заявку (общая ссылка на клуб). */
+function matchesRaffleTriple(entry, nameKey, vkKey, tgKey) {
+  return entry.nameKey === nameKey && entry.vkKey === vkKey && entry.tgKey === tgKey;
 }
 
 const TICKET_MIN = 1;
@@ -176,17 +194,33 @@ export const raffleController = {
       return res.status(400).json({ error: 'NEED_TELEGRAM_HANDLE' });
     }
 
+    if (RAFFLE_BLOCKED_VK_KEYS.size > 0 && RAFFLE_BLOCKED_VK_KEYS.has(vkKey)) {
+      return res.status(400).json({ error: 'RAFFLE_USE_PERSONAL_VK' });
+    }
+    if (RAFFLE_BLOCKED_TG_KEYS.size > 0 && RAFFLE_BLOCKED_TG_KEYS.has(tgKey)) {
+      return res.status(400).json({ error: 'RAFFLE_USE_PERSONAL_TELEGRAM' });
+    }
+
     const dupVk = await prisma.raffleEntry.findUnique({ where: { vkKey } });
     if (dupVk) {
-      return res.status(200).json(entryToPublicJson(dupVk, { recovered: true }));
+      if (matchesRaffleTriple(dupVk, nameKey, vkKey, tgKey)) {
+        return res.status(200).json(entryToPublicJson(dupVk, { recovered: true }));
+      }
+      return res.status(409).json({ error: 'RAFFLE_VK_NOT_UNIQUE' });
     }
     const dupTg = await prisma.raffleEntry.findUnique({ where: { tgKey } });
     if (dupTg) {
-      return res.status(200).json(entryToPublicJson(dupTg, { recovered: true }));
+      if (matchesRaffleTriple(dupTg, nameKey, vkKey, tgKey)) {
+        return res.status(200).json(entryToPublicJson(dupTg, { recovered: true }));
+      }
+      return res.status(409).json({ error: 'RAFFLE_TG_NOT_UNIQUE' });
     }
     const dupName = await prisma.raffleEntry.findUnique({ where: { nameKey } });
     if (dupName) {
-      return res.status(409).json({ error: 'DUPLICATE_NAME', ticketNumber: dupName.ticketNumber });
+      if (matchesRaffleTriple(dupName, nameKey, vkKey, tgKey)) {
+        return res.status(200).json(entryToPublicJson(dupName, { recovered: true }));
+      }
+      return res.status(409).json({ error: 'DUPLICATE_NAME' });
     }
 
     let created;
@@ -236,9 +270,20 @@ export const raffleController = {
           prisma.raffleEntry.findUnique({ where: { tgKey } }),
           prisma.raffleEntry.findUnique({ where: { nameKey } })
         ]);
-        if (byVk) return res.status(200).json(entryToPublicJson(byVk, { recovered: true }));
-        if (byTg) return res.status(200).json(entryToPublicJson(byTg, { recovered: true }));
-        if (byName) return res.status(409).json({ error: 'DUPLICATE_NAME', ticketNumber: byName.ticketNumber });
+        const recovered =
+          byVk && matchesRaffleTriple(byVk, nameKey, vkKey, tgKey)
+            ? byVk
+            : byTg && matchesRaffleTriple(byTg, nameKey, vkKey, tgKey)
+              ? byTg
+              : byName && matchesRaffleTriple(byName, nameKey, vkKey, tgKey)
+                ? byName
+                : null;
+        if (recovered) {
+          return res.status(200).json(entryToPublicJson(recovered, { recovered: true }));
+        }
+        if (byVk) return res.status(409).json({ error: 'RAFFLE_VK_NOT_UNIQUE' });
+        if (byTg) return res.status(409).json({ error: 'RAFFLE_TG_NOT_UNIQUE' });
+        if (byName) return res.status(409).json({ error: 'DUPLICATE_NAME' });
       }
       throw error;
     }

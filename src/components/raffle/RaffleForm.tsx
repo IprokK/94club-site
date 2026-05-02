@@ -4,20 +4,31 @@ import type { ApiError } from '../../api/client';
 import { createRaffleEntry, type RaffleEntry } from '../../api/raffle';
 
 function errorToText(err: unknown) {
-  const e = err as Partial<ApiError> & { ticketNumber?: string };
-  if (e?.status === 409 && e.ticketNumber && e.error === 'DUPLICATE_NAME') {
-    return `Это ФИО уже занято другим участником (билет ${e.ticketNumber}). Укажи ФИО как в документе; если это ты — проверь VK и Telegram.`;
+  const e = err as Partial<ApiError>;
+  if (e?.status === 409 && e.error === 'RAFFLE_VK_NOT_UNIQUE') {
+    return 'Такой VK уже указан в другой заявке. Нужна ссылка на свою личную страницу (ник или vk.com/id…), а не сообщество клуба и не общая ссылка.';
   }
-  if (e?.status === 409 && e.ticketNumber) return `Уже есть билет ${e.ticketNumber} по этим данным.`;
+  if (e?.status === 409 && e.error === 'RAFFLE_TG_NOT_UNIQUE') {
+    return 'Такой Telegram уже указан в другой заявке. Укажи свой @ник или ссылку на свой профиль, не на канал клуба.';
+  }
+  if (e?.status === 409 && e.error === 'DUPLICATE_NAME') {
+    return 'Это ФИО уже занято другой заявкой с другими VK/Telegram. Проверь ФИО как в документе или напиши организаторам.';
+  }
   if (e?.status === 409 && e.error === 'NO_FREE_TICKET_NUMBERS') {
     return 'Свободных номеров билетов не осталось. Напиши организаторам.';
   }
-  if (e?.status === 409) return 'Такой участник уже зарегистрирован.';
+  if (e?.status === 409) return 'Заявка с такими данными уже есть или конфликтует с другой.';
   if (e?.error === 'NEED_VK_PROFILE_URL') {
     return 'Укажи ссылку на свою страницу VK: vk.com/ник или vk.com/id…. Ссылки из раздела «Сообщения» (im) без id или общая лента не подходят.';
   }
   if (e?.error === 'NEED_TELEGRAM_HANDLE') {
     return 'Укажи свой Telegram: @ник или ссылка именно на профиль. Для t.me/s/… нужно полное имя после /s/.';
+  }
+  if (e?.error === 'RAFFLE_USE_PERSONAL_VK') {
+    return 'В поле VK нужна именно твоя личная страница, а не сообщество клуба. Подписку на сообщество сделай отдельно по условиям.';
+  }
+  if (e?.error === 'RAFFLE_USE_PERSONAL_TELEGRAM') {
+    return 'В поле Telegram нужен именно твой аккаунт (@ник), а не канал или чат клуба.';
   }
   if (e?.error === 'NEED_NAME_VK_TELEGRAM' || e?.status === 400) {
     return 'Укажи ФИО, VK и Telegram.';
