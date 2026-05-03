@@ -16,6 +16,26 @@ function parseCommaBlockedKeys(raw) {
 const RAFFLE_BLOCKED_VK_KEYS = parseCommaBlockedKeys(process.env.RAFFLE_BLOCKED_VK_KEYS);
 const RAFFLE_BLOCKED_TG_KEYS = parseCommaBlockedKeys(process.env.RAFFLE_BLOCKED_TG_KEYS);
 
+/**
+ * Режим записи видео: фиксированные победители вместо random.
+ * Формат: `1:8,2:16,3:20,4:19` (место:id билета из raffle_entries).
+ * Перед съёмкой удалить все строки raffle_winners, выставить env, перезапустить API; после — убрать env.
+ */
+function getFixedRaffleDrawMap() {
+  const raw = String(process.env.RAFFLE_FIXED_DRAW || '').trim();
+  if (!raw) return null;
+  const map = new Map();
+  for (const segment of raw.split(',')) {
+    const parts = segment.split(':').map((s) => s.trim());
+    if (parts.length !== 2) continue;
+    const place = Number(parts[0]);
+    const entryId = Number(parts[1]);
+    if (![1, 2, 3, 4].includes(place) || !Number.isFinite(entryId)) continue;
+    map.set(place, entryId);
+  }
+  return map.size ? map : null;
+}
+
 const entryCreateSchema = z.object({
   name: z.string().min(2).max(120),
   vk: z.string().min(1).max(200),
@@ -337,16 +357,34 @@ export const raffleController = {
       ? { ...baseWhere, id: { notIn: alreadyWinnerIds } }
       : baseWhere;
 
-    const pool = await prisma.raffleEntry.findMany({
-      where,
-      select: { id: true }
-    });
+    const fixedMap = getFixedRaffleDrawMap();
+    let pick;
 
-    if (!pool.length) {
-      return res.status(409).json({ error: 'NO_ELIGIBLE_ENTRIES' });
+    if (fixedMap?.has(place)) {
+      const wantedId = fixedMap.get(place);
+      pick = await prisma.raffleEntry.findFirst({
+        where: { ...where, id: wantedId },
+        select: { id: true }
+      });
+      if (!pick) {
+        return res.status(409).json({
+          error: 'FIXED_DRAW_ENTRY_INELIGIBLE',
+          message: `Билет id=${wantedId} недоступен для места ${place} (нет двух галочек или уже выиграл).`
+        });
+      }
+      console.warn(`[raffle] RAFFLE_FIXED_DRAW: место ${place} → entry ${wantedId}`);
+    } else {
+      const pool = await prisma.raffleEntry.findMany({
+        where,
+        select: { id: true }
+      });
+
+      if (!pool.length) {
+        return res.status(409).json({ error: 'NO_ELIGIBLE_ENTRIES' });
+      }
+
+      pick = pool[Math.floor(Math.random() * pool.length)];
     }
-
-    const pick = pool[Math.floor(Math.random() * pool.length)];
 
     const winner = await prisma.raffleWinner.create({
       data: { place, entryId: pick.id },

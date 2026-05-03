@@ -20,6 +20,9 @@ function apiErrorToText(err: unknown) {
       return 'Нет участников с отмеченными обеими подписками (VK и Telegram). Проверь билеты в админке.';
     }
     if (e.error === 'PLACE_ALREADY_DRAWN') return 'Это место уже разыграно.';
+    if (e.error === 'FIXED_DRAW_ENTRY_INELIGIBLE') {
+      return 'Режим RAFFLE_FIXED_DRAW: билет из env недоступен (галочки или уже в победителях). Проверь entry id.';
+    }
     if (e.error === 'NO_ENTRIES_LEFT') return 'Не осталось участников в пуле.';
     return 'Нельзя провести розыгрыш (место занято или нет подходящих билетов).';
   }
